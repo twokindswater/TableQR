@@ -1,36 +1,3 @@
-// Database Types
-export interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: User
-        Insert: UserInsert
-        Update: UserUpdate
-      }
-      stores: {
-        Row: Store
-        Insert: StoreInsert
-        Update: StoreUpdate
-      }
-      categories: {
-        Row: Category
-        Insert: CategoryInsert
-        Update: CategoryUpdate
-      }
-      menus: {
-        Row: Menu
-        Insert: MenuInsert
-        Update: MenuUpdate
-      }
-      tables: {
-        Row: Table
-        Insert: TableInsert
-        Update: TableUpdate
-      }
-    }
-  }
-}
-
 // User Types
 export interface User {
   id: string
@@ -105,3 +72,52 @@ export interface Table {
 export type TableInsert = Omit<Table, 'id' | 'created_at'>
 export type TableUpdate = Partial<TableInsert>
 
+// Database Type for Supabase
+export type Database = {
+  public: {
+    Tables: {
+      users: {
+        Row: User
+        Insert: UserInsert
+        Update: UserUpdate
+        Relationships: []
+      }
+      stores: {
+        Row: Store
+        Insert: StoreInsert
+        Update: StoreUpdate
+        Relationships: []
+      }
+      categories: {
+        Row: Category
+        Insert: CategoryInsert
+        Update: CategoryUpdate
+        Relationships: []
+      }
+      menus: {
+        Row: Menu
+        Insert: MenuInsert
+        Update: MenuUpdate
+        Relationships: []
+      }
+      tables: {
+        Row: Table
+        Insert: TableInsert
+        Update: TableUpdate
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}

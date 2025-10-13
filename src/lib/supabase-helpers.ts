@@ -3,6 +3,7 @@
  * Phase 4: 데이터베이스 설계 및 구축
  */
 
+
 import { supabase } from '@/lib/supabase';
 import type {
   User,
