@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Store } from '@/types/database';
@@ -35,19 +35,7 @@ export default function StoresPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 스토어 목록 조회
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-      return;
-    }
-
-    if (session?.user?.id) {
-      loadStores();
-    }
-  }, [session, status, router]);
-
-  const loadStores = async () => {
+  const loadStores = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
@@ -77,7 +65,19 @@ export default function StoresPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.user?.id, toast]);
+
+  // 스토어 목록 조회
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+
+    if (session?.user?.id) {
+      loadStores();
+    }
+  }, [session, status, router, loadStores]);
 
   const handleDeleteClick = async (storeId: number) => {
     const confirmed = window.confirm('정말로 이 가게를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.');

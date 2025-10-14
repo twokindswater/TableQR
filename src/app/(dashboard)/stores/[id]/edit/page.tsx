@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { StoreForm } from '@/components/stores/store-form';
@@ -22,19 +22,7 @@ export default function EditStorePage() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 스토어 정보 조회
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-      return;
-    }
-
-    if (storeId) {
-      loadStore();
-    }
-  }, [storeId, status, router]);
-
-  const loadStore = async () => {
+  const loadStore = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getStoreById(storeId);
@@ -80,7 +68,19 @@ export default function EditStorePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId, router, toast]);
+
+  // 스토어 정보 조회
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+
+    if (storeId) {
+      loadStore();
+    }
+  }, [storeId, status, router, loadStore]);
 
   const handleSubmit = async (data: StoreInsert) => {
     if (!session?.user?.id) {
