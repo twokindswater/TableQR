@@ -1,13 +1,10 @@
 /**
  * Supabase Database Helper Functions
- * Phase 4: 데이터베이스 설계 및 구축
+ * 기존 테이블 구조 활용 (stores, menus, categories, qrcodes)
  */
-
 
 import { supabase } from '@/lib/supabase';
 import type {
-  User,
-  UserInsert,
   Store,
   StoreInsert,
   StoreUpdate,
@@ -17,56 +14,11 @@ import type {
   Menu,
   MenuInsert,
   MenuUpdate,
-  Table,
-  TableInsert,
-  TableUpdate,
+  QRCode,
+  QRCodeInsert,
+  QRCodeUpdate,
+  Account,
 } from '@/types/database';
-
-// =====================================================
-// Users
-// =====================================================
-
-/**
- * Google OAuth 정보로 사용자 생성 또는 업데이트
- */
-export async function upsertUser(userData: UserInsert) {
-  const { data, error } = await supabase
-    .from('users')
-    .upsert(userData, { onConflict: 'google_id' })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as User;
-}
-
-/**
- * 이메일로 사용자 조회
- */
-export async function getUserByEmail(email: string) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single();
-
-  if (error && error.code !== 'PGRST116') throw error; // PGRST116 = not found
-  return data as User | null;
-}
-
-/**
- * Google ID로 사용자 조회
- */
-export async function getUserByGoogleId(googleId: string) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('google_id', googleId)
-    .single();
-
-  if (error && error.code !== 'PGRST116') throw error;
-  return data as User | null;
-}
 
 // =====================================================
 // Stores
@@ -76,7 +28,7 @@ export async function getUserByGoogleId(googleId: string) {
  * 사용자의 모든 매장 조회
  */
 export async function getStoresByUserId(userId: string) {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('stores')
     .select('*')
     .eq('user_id', userId)
@@ -89,11 +41,11 @@ export async function getStoresByUserId(userId: string) {
 /**
  * 매장 ID로 단일 매장 조회
  */
-export async function getStoreById(storeId: string) {
+export async function getStoreById(storeId: number) {
   const { data, error } = await supabase
     .from('stores')
     .select('*')
-    .eq('id', storeId)
+    .eq('store_id', storeId)
     .single();
 
   if (error && error.code !== 'PGRST116') throw error;
@@ -117,11 +69,11 @@ export async function createStore(storeData: StoreInsert) {
 /**
  * 매장 정보 업데이트
  */
-export async function updateStore(storeId: string, storeData: StoreUpdate) {
+export async function updateStore(storeId: number, storeData: StoreUpdate) {
   const { data, error } = await supabase
     .from('stores')
     .update(storeData)
-    .eq('id', storeId)
+    .eq('store_id', storeId)
     .select()
     .single();
 
@@ -132,8 +84,8 @@ export async function updateStore(storeId: string, storeData: StoreUpdate) {
 /**
  * 매장 삭제
  */
-export async function deleteStore(storeId: string) {
-  const { error } = await supabase.from('stores').delete().eq('id', storeId);
+export async function deleteStore(storeId: number) {
+  const { error } = await supabase.from('stores').delete().eq('store_id', storeId);
 
   if (error) throw error;
 }
@@ -145,7 +97,7 @@ export async function deleteStore(storeId: string) {
 /**
  * 매장의 모든 카테고리 조회
  */
-export async function getCategoriesByStoreId(storeId: string) {
+export async function getCategoriesByStoreId(storeId: number) {
   const { data, error } = await supabase
     .from('categories')
     .select('*')
@@ -174,13 +126,13 @@ export async function createCategory(categoryData: CategoryInsert) {
  * 카테고리 업데이트
  */
 export async function updateCategory(
-  categoryId: string,
+  categoryId: number,
   categoryData: CategoryUpdate
 ) {
   const { data, error } = await supabase
     .from('categories')
     .update(categoryData)
-    .eq('id', categoryId)
+    .eq('category_id', categoryId)
     .select()
     .single();
 
@@ -191,11 +143,11 @@ export async function updateCategory(
 /**
  * 카테고리 삭제
  */
-export async function deleteCategory(categoryId: string) {
+export async function deleteCategory(categoryId: number) {
   const { error } = await supabase
     .from('categories')
     .delete()
-    .eq('id', categoryId);
+    .eq('category_id', categoryId);
 
   if (error) throw error;
 }
@@ -207,15 +159,13 @@ export async function deleteCategory(categoryId: string) {
 /**
  * 매장의 모든 메뉴 조회 (카테고리 포함)
  */
-export async function getMenusByStoreId(storeId: string) {
+export async function getMenusByStoreId(storeId: number) {
   const { data, error } = await supabase
     .from('menus')
-    .select(
-      `
+    .select(`
       *,
       category:categories(*)
-    `
-    )
+    `)
     .eq('store_id', storeId)
     .order('display_order', { ascending: true });
 
@@ -226,7 +176,7 @@ export async function getMenusByStoreId(storeId: string) {
 /**
  * 카테고리별 메뉴 조회
  */
-export async function getMenusByCategoryId(categoryId: string) {
+export async function getMenusByCategoryId(categoryId: number) {
   const { data, error } = await supabase
     .from('menus')
     .select('*')
@@ -240,17 +190,15 @@ export async function getMenusByCategoryId(categoryId: string) {
 /**
  * 판매 가능한 메뉴만 조회 (고객용)
  */
-export async function getAvailableMenus(storeId: string) {
+export async function getAvailableMenus(storeId: number) {
   const { data, error } = await supabase
     .from('menus')
-    .select(
-      `
+    .select(`
       *,
       category:categories(*)
-    `
-    )
+    `)
     .eq('store_id', storeId)
-    .eq('is_available', true)
+    .eq('is_active', true)
     .order('display_order', { ascending: true });
 
   if (error) throw error;
@@ -274,11 +222,11 @@ export async function createMenu(menuData: MenuInsert) {
 /**
  * 메뉴 업데이트
  */
-export async function updateMenu(menuId: string, menuData: MenuUpdate) {
+export async function updateMenu(menuId: number, menuData: MenuUpdate) {
   const { data, error } = await supabase
     .from('menus')
     .update(menuData)
-    .eq('id', menuId)
+    .eq('menu_id', menuId)
     .select()
     .single();
 
@@ -289,8 +237,8 @@ export async function updateMenu(menuId: string, menuData: MenuUpdate) {
 /**
  * 메뉴 삭제
  */
-export async function deleteMenu(menuId: string) {
-  const { error } = await supabase.from('menus').delete().eq('id', menuId);
+export async function deleteMenu(menuId: number) {
+  const { error } = await supabase.from('menus').delete().eq('menu_id', menuId);
 
   if (error) throw error;
 }
@@ -299,13 +247,13 @@ export async function deleteMenu(menuId: string) {
  * 메뉴 품절 처리
  */
 export async function toggleMenuAvailability(
-  menuId: string,
-  isAvailable: boolean
+  menuId: number,
+  isActive: boolean
 ) {
   const { data, error } = await supabase
     .from('menus')
-    .update({ is_available: isAvailable })
-    .eq('id', menuId)
+    .update({ is_active: isActive })
+    .eq('menu_id', menuId)
     .select()
     .single();
 
@@ -314,77 +262,114 @@ export async function toggleMenuAvailability(
 }
 
 // =====================================================
-// Tables
+// QR Codes / Tables
 // =====================================================
 
 /**
- * 매장의 모든 테이블 조회
+ * 매장의 모든 QR 코드/테이블 조회
  */
-export async function getTablesByStoreId(storeId: string) {
+export async function getQRCodesByStoreId(storeId: number) {
   const { data, error } = await supabase
-    .from('tables')
+    .from('qrcodes')
     .select('*')
     .eq('store_id', storeId)
     .order('table_number', { ascending: true });
 
   if (error) throw error;
-  return data as Table[];
+  return data as QRCode[];
 }
 
 /**
- * 테이블 ID로 조회
+ * QR 코드 ID로 조회
  */
-export async function getTableById(tableId: string) {
+export async function getQRCodeById(qrId: number) {
   const { data, error } = await supabase
-    .from('tables')
-    .select(
-      `
+    .from('qrcodes')
+    .select(`
       *,
       store:stores(*)
-    `
-    )
-    .eq('id', tableId)
+    `)
+    .eq('qr_id', qrId)
     .single();
 
   if (error && error.code !== 'PGRST116') throw error;
-  return data as (Table & { store: Store }) | null;
+  return data as (QRCode & { store: Store }) | null;
 }
 
 /**
- * 테이블 생성
+ * QR 코드 생성
  */
-export async function createTable(tableData: TableInsert) {
+export async function createQRCode(qrCodeData: QRCodeInsert) {
   const { data, error } = await supabase
-    .from('tables')
-    .insert(tableData)
+    .from('qrcodes')
+    .insert(qrCodeData)
     .select()
     .single();
 
   if (error) throw error;
-  return data as Table;
+  return data as QRCode;
 }
 
 /**
- * 테이블 업데이트
+ * QR 코드 업데이트
  */
-export async function updateTable(tableId: string, tableData: TableUpdate) {
+export async function updateQRCode(qrId: number, qrCodeData: QRCodeUpdate) {
   const { data, error } = await supabase
-    .from('tables')
-    .update(tableData)
-    .eq('id', tableId)
+    .from('qrcodes')
+    .update(qrCodeData)
+    .eq('qr_id', qrId)
     .select()
     .single();
 
   if (error) throw error;
-  return data as Table;
+  return data as QRCode;
 }
 
 /**
- * 테이블 삭제
+ * QR 코드 삭제
  */
-export async function deleteTable(tableId: string) {
-  const { error } = await supabase.from('tables').delete().eq('id', tableId);
+export async function deleteQRCode(qrId: number) {
+  const { error } = await supabase.from('qrcodes').delete().eq('qr_id', qrId);
 
   if (error) throw error;
 }
 
+// 편의를 위한 별칭
+export const getTablesByStoreId = getQRCodesByStoreId;
+export const getTableById = getQRCodeById;
+export const createTable = createQRCode;
+export const updateTable = updateQRCode;
+export const deleteTable = deleteQRCode;
+
+// =====================================================
+// Accounts
+// =====================================================
+
+/**
+ * 사용자 ID로 계정 정보 조회
+ */
+export async function getAccountByUserId(userId: string) {
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('*')
+    .eq('auth_user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data as Account | null;
+}
+
+/**
+ * 계정 정보 업데이트
+ */
+export async function updateAccount(accountId: number, accountData: Partial<Account>) {
+  const { data, error } = await supabase
+    .from('accounts')
+    .update(accountData)
+    .eq('account_id', accountId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Account;
+}

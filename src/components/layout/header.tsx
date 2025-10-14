@@ -43,7 +43,7 @@ export function Header() {
           <nav className="flex items-center space-x-2">
             {session?.user && (
               <>
-                {session.user.image ? (
+                {session.user.image && session.user.image.trim() !== '' ? (
                   <div className="flex items-center space-x-2">
                     <Image
                       src={session.user.image}

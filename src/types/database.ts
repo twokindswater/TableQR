@@ -1,87 +1,86 @@
-// User Types
-export interface User {
-  id: string
-  email: string
-  google_id: string
-  name: string
-  profile_image: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type UserInsert = Omit<User, 'id' | 'created_at' | 'updated_at'>
-export type UserUpdate = Partial<UserInsert>
-
-// Store Types
+// Store Types (기존 테이블 활용)
 export interface Store {
-  id: string
-  user_id: string
-  name: string
-  logo: string | null
-  phone: string | null
-  business_hours: string | null
-  notice: string | null
+  store_id: number  // bigint
+  user_id: string | null  // uuid
+  name: string | null
   description: string | null
+  phone: string | null
+  logo_url: string | null  // 우리의 logo 역할
+  cover_url: string | null
+  business_hours: string | null  // 새로 추가
+  notice: string | null  // 새로 추가
+  address: string | null
   created_at: string
-  updated_at: string
+  updated_at: string | null
 }
 
-export type StoreInsert = Omit<Store, 'id' | 'created_at' | 'updated_at'>
+export type StoreInsert = Omit<Store, 'store_id' | 'created_at' | 'updated_at'>
 export type StoreUpdate = Partial<StoreInsert>
 
-// Category Types
+// Category Types (새로 생성)
 export interface Category {
-  id: string
-  store_id: string
+  category_id: number  // bigint
+  store_id: number
   name: string
   display_order: number
   created_at: string
 }
 
-export type CategoryInsert = Omit<Category, 'id' | 'created_at'>
-export type CategoryUpdate = Partial<CategoryInsert>
+export type CategoryInsert = Omit<Category, 'category_id' | 'created_at'>
+export type CategoryUpdate = Partial<Omit<CategoryInsert, 'store_id'>>
 
-// Menu Types
+// Menu Types (기존 테이블 활용)
 export interface Menu {
-  id: string
-  store_id: string
-  category_id: string | null
-  name: string
-  price: number
-  description: string | null
-  image: string | null
-  allergy_info: string[] | null
-  is_available: boolean
-  display_order: number
+  menu_id: number  // bigint
+  store_id: number | null
+  category_id: number | null  // 새로 추가
+  name: string | null
+  price: number | null  // real (float4)
+  description: string | null  // 새로 추가
+  image_url: string | null  // 우리의 image 역할
+  allergy_info: string[] | null  // 새로 추가
+  is_active: boolean | null  // 우리의 is_available 역할
+  display_order: number | null  // 새로 추가
   created_at: string
-  updated_at: string
+  updated_at: string | null
 }
 
-export type MenuInsert = Omit<Menu, 'id' | 'created_at' | 'updated_at'>
+export type MenuInsert = Omit<Menu, 'menu_id' | 'created_at' | 'updated_at'>
 export type MenuUpdate = Partial<MenuInsert>
 
-// Table (QR Code) Types
-export interface Table {
-  id: string
-  store_id: string
-  table_number: string
-  qr_code_url: string | null
+// QRCode/Table Types (기존 qrcodes 테이블 활용)
+export interface QRCode {
+  qr_id: number  // bigint
+  store_id: number | null
+  code: string | null
+  table_number: string | null  // 새로 추가
+  is_active: boolean | null
   created_at: string
 }
 
-export type TableInsert = Omit<Table, 'id' | 'created_at'>
-export type TableUpdate = Partial<TableInsert>
+export type QRCodeInsert = Omit<QRCode, 'qr_id' | 'created_at'>
+export type QRCodeUpdate = Partial<QRCodeInsert>
 
-// Database Type for Supabase
+// Account Types (기존 accounts 테이블 - users 역할)
+export interface Account {
+  account_id: number
+  auth_user_id: string | null  // uuid
+  role: number | null  // smallint
+  name: string | null
+  email: string | null
+  created_at: string
+  updated_at: string | null
+}
+
+// 편의를 위한 타입 별칭
+export type Table = QRCode;
+export type TableInsert = QRCodeInsert;
+export type TableUpdate = QRCodeUpdate;
+
+// Database Type for Supabase (필요시 사용)
 export type Database = {
   public: {
     Tables: {
-      users: {
-        Row: User
-        Insert: UserInsert
-        Update: UserUpdate
-        Relationships: []
-      }
       stores: {
         Row: Store
         Insert: StoreInsert
@@ -100,10 +99,14 @@ export type Database = {
         Update: MenuUpdate
         Relationships: []
       }
-      tables: {
-        Row: Table
-        Insert: TableInsert
-        Update: TableUpdate
+      qrcodes: {
+        Row: QRCode
+        Insert: QRCodeInsert
+        Update: QRCodeUpdate
+        Relationships: []
+      }
+      accounts: {
+        Row: Account
         Relationships: []
       }
     }

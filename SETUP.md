@@ -86,9 +86,12 @@ yarn dev
 - [x] **Phase 2**: 디자인 시스템 및 공통 컴포넌트 (Button, Input, Card, Label, Textarea, Dialog, Toast, Badge, Select, Header, Spinner)
 - [x] **Phase 3**: 인증 시스템 (Google OAuth, NextAuth.js, 세션 관리, 보호된 라우트)
 - [x] **Phase 4**: 데이터베이스 설계 및 구축 (스키마, 마이그레이션, RLS, 헬퍼 함수)
+- [x] **Phase 5**: 멀티 스토어 관리 기능 (스토어 목록, 추가/수정/삭제, 카드/폼 컴포넌트)
 
 ### 📅 다음 단계
-- [ ] **Phase 5**: 멀티 스토어 관리 기능 (스토어 목록, 추가/수정/삭제)
+- [ ] **Phase 6**: 메뉴 관리 기능 (카테고리, 메뉴 CRUD, 품절 처리)
+- [ ] **Phase 7**: QR 코드 생성 및 관리
+- [ ] **Phase 8**: 고객용 메뉴 페이지
 
 ### ⚠️ 필수 설정 필요
 
@@ -150,7 +153,8 @@ npm run lint
 | Phase 2 | ✅ 100% | 디자인 시스템 구축 |
 | Phase 3 | ✅ 100% | 인증 시스템 (Google OAuth) |
 | Phase 4 | ✅ 100% | 데이터베이스 설계 및 구축 |
-| Phase 5 | 📅 예정 | 멀티 스토어 관리 |
+| Phase 5 | ✅ 100% | 멀티 스토어 관리 |
+| Phase 6 | 📅 예정 | 메뉴 관리 기능 |
 
 ---
 
@@ -188,6 +192,7 @@ npm run dev
 - [PHASE3_COMPLETE.md](./PHASE3_COMPLETE.md) - Phase 3 완료 내역
 - [PHASE4_DATABASE_SCHEMA.md](./PHASE4_DATABASE_SCHEMA.md) - 데이터베이스 스키마 설계
 - [PHASE4_COMPLETE.md](./PHASE4_COMPLETE.md) - Phase 4 완료 내역
+- [PHASE5_COMPLETE.md](./PHASE5_COMPLETE.md) - Phase 5 완료 내역
 
 ---
 
