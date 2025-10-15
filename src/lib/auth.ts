@@ -21,6 +21,8 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
+  debug: process.env.NODE_ENV === 'development',
+  useSecureCookies: process.env.NODE_ENV === 'production',
   callbacks: {
     async signIn({ user, account, profile }) {
       // 로그인은 항상 허용하고, 계정 생성은 클라이언트 사이드에서 처리
