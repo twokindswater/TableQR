@@ -24,7 +24,17 @@ export function useAccountSync() {
           role: 0, // 기본 역할 (0: 일반 사용자)
         });
 
-      // 에러가 발생해도 이미 계정이 있는 경우일 수 있으므로 isSynced를 true로 설정
+      // 이미 계정이 있는 경우 (unique constraint violation)
+      if (insertError?.code === '23505') {
+        setIsSynced(true);
+        return;
+      }
+
+      // 다른 에러가 발생한 경우
+      if (insertError) {
+        throw insertError;
+      }
+
       setIsSynced(true);
     } catch (error) {
       console.error('계정 동기화 중 오류:', error);

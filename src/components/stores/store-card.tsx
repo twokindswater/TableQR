@@ -18,7 +18,7 @@ export function StoreCard({ store, menuCount = 0, onDelete }: StoreCardProps) {
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* 스토어 로고 */}
       <div className="relative h-48 bg-gray-100">
-        {store.logo_url && store.logo_url.trim() !== '' ? (
+        {store.logo_url && store.logo_url.trim() !== '' && store.logo_url.startsWith('http') ? (
           <Image
             src={store.logo_url}
             alt={store.name || '매장'}

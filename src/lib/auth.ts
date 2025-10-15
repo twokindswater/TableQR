@@ -1,6 +1,19 @@
 import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 
+import { Session } from "next-auth";
+
+// 개발 환경용 mock 세션
+const mockSession: Session = {
+  user: {
+    id: '104085693824085358553',
+    name: 'Test User',
+    email: 'mekingme@gmail.com',
+    image: null,
+  },
+  expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30일 후 만료
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -15,6 +28,11 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async session({ session, token }) {
+      // 개발 환경에서 mock 세션 사용
+      if (process.env.NODE_ENV === 'development') {
+        return mockSession;
+      }
+
       if (session.user && token.sub) {
         // 세션에 사용자 ID 추가
         session.user.id = token.sub

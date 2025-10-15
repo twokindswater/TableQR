@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/use-session';
 import { useRouter } from 'next/navigation';
 import { StoreForm } from '@/components/stores/store-form';
 import { createStore } from '@/lib/supabase-helpers';
@@ -52,25 +52,11 @@ export default function NewStorePage() {
       router.push('/stores');
     } catch (error) {
       console.error('스토어 생성 실패:', error);
-      
-      // 개발 중: Mock 데이터 사용
-      if (process.env.NODE_ENV === 'development') {
-        const { mockStoreAPI } = await import('@/lib/mock-data');
-        mockStoreAPI.create(storeData);
-        
-        toast({
-          title: '개발 모드',
-          description: 'Mock 데이터로 저장되었습니다. Supabase를 활성화하세요.',
-        });
-        
-        router.push('/stores');
-      } else {
-        toast({
-          title: '오류',
-          description: '가게 등록에 실패했습니다. 다시 시도해주세요.',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: '오류',
+        description: '가게 등록에 실패했습니다. 다시 시도해주세요.',
+        variant: 'destructive',
+      });
     }
   };
 

@@ -40,31 +40,12 @@ export default function EditStorePage() {
       setStore(data);
     } catch (error) {
       console.error('스토어 조회 실패:', error);
-      
-      // 개발 중: Mock 데이터 사용
-      if (process.env.NODE_ENV === 'development') {
-        const { mockStoreAPI } = await import('@/lib/mock-data');
-        const mockData = mockStoreAPI.getById(storeId);
-        
-        if (!mockData) {
-          toast({
-            title: '오류',
-            description: '스토어를 찾을 수 없습니다.',
-            variant: 'destructive',
-          });
-          router.push('/stores');
-          return;
-        }
-        
-        setStore(mockData);
-      } else {
-        toast({
-          title: '오류',
-          description: '스토어 정보를 불러오는데 실패했습니다.',
-          variant: 'destructive',
-        });
-        router.push('/stores');
-      }
+      toast({
+        title: '오류',
+        description: '스토어 정보를 불러오는데 실패했습니다.',
+        variant: 'destructive',
+      });
+      router.push('/stores');
     } finally {
       setLoading(false);
     }
@@ -103,25 +84,11 @@ export default function EditStorePage() {
       router.push('/stores');
     } catch (error) {
       console.error('스토어 수정 실패:', error);
-      
-      // 개발 중: Mock 데이터 사용
-      if (process.env.NODE_ENV === 'development') {
-        const { mockStoreAPI } = await import('@/lib/mock-data');
-        mockStoreAPI.update(storeId, data);
-        
-        toast({
-          title: '개발 모드',
-          description: 'Mock 데이터가 수정되었습니다.',
-        });
-        
-        router.push('/stores');
-      } else {
-        toast({
-          title: '오류',
-          description: '스토어 수정에 실패했습니다. 다시 시도해주세요.',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: '오류',
+        description: '스토어 수정에 실패했습니다. 다시 시도해주세요.',
+        variant: 'destructive',
+      });
     }
   };
 
