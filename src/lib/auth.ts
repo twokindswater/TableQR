@@ -28,12 +28,12 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async session({ session, token }) {
-      // 개발 환경에서 mock 세션 사용
-      if (process.env.NODE_ENV === 'development') {
+      // 실제 세션이 있으면 사용, 없으면 개발 환경에서 mock 세션 사용
+      if (!session && process.env.NODE_ENV === 'development') {
         return mockSession;
       }
 
-      if (session.user && token.sub) {
+      if (session?.user && token.sub) {
         // 세션에 사용자 ID 추가
         session.user.id = token.sub
       }
