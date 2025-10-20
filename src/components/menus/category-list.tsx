@@ -208,87 +208,91 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
     }
   };
 
+  // 카테고리 아이템 컴포넌트
+  const CategoryItem = ({ category }: { category: Category }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: category.category_id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div 
+        ref={setNodeRef} 
+        style={style}
+        {...attributes}
+        {...listeners}
+        className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group cursor-move"
+      >
+        <GripVertical className="w-5 h-5 text-gray-400" />
+        <span className="flex-1">{category.name}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedCategory(category);
+            setNewCategory({
+              name: category.name,
+              description: category.description || '',
+            });
+            setIsEditDialogOpen(true);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Pencil className="w-4 h-4" />
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <Trash className="w-4 h-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>카테고리 삭제</AlertDialogTitle>
+              <AlertDialogDescription>
+                정말로 이 카테고리를 삭제하시겠습니까?
+                이 작업은 되돌릴 수 없으며, 카테고리에 속한 모든 메뉴가 미분류 상태가 됩니다.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleDeleteCategory(category.category_id)}
+              >
+                삭제
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* 카테고리 목록 */}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext items={categories.map(cat => cat.category_id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
-            {categories.map((category) => {
-              const {
-                attributes,
-                listeners,
-                setNodeRef,
-                transform,
-                transition,
-                isDragging,
-              } = useSortable({ id: category.category_id });
-
-              const style = {
-                transform: CSS.Transform.toString(transform),
-                transition,
-                opacity: isDragging ? 0.5 : 1,
-              };
-
-              return (
-                <div 
-                  key={category.category_id}
-                  ref={setNodeRef} 
-                  style={style}
-                  {...attributes}
-                  {...listeners}
-                  className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group cursor-move"
-                >
-                  <GripVertical className="w-5 h-5 text-gray-400" />
-                  <span className="flex-1">{category.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedCategory(category);
-                      setNewCategory({
-                        name: category.name,
-                        description: category.description || '',
-                      });
-                      setIsEditDialogOpen(true);
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <Trash className="w-4 h-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>카테고리 삭제</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          정말로 이 카테고리를 삭제하시겠습니까?
-                          이 작업은 되돌릴 수 없으며, 카테고리에 속한 모든 메뉴가 미분류 상태가 됩니다.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>취소</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteCategory(category.category_id)}
-                        >
-                          삭제
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              );
-            })}
+            {categories.map((category) => (
+              <CategoryItem key={category.category_id} category={category} />
+            ))}
           </div>
         </SortableContext>
       </DndContext>
