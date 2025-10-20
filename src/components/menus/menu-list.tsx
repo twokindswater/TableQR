@@ -407,9 +407,16 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                   
                   {/* 메뉴 정보 영역 */}
                   <div className="p-3">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                      {menu.name || '이름 없음'}
-                    </h3>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight flex-1">
+                        {menu.name || '이름 없음'}
+                      </h3>
+                      {menu.category_id && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary shrink-0">
+                          {categories.find(cat => cat.category_id === menu.category_id)?.name || '미분류'}
+                        </span>
+                      )}
+                    </div>
                     {menu.description && (
                       <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
                         {menu.description}
