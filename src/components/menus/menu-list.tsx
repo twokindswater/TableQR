@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Tables } from '@/types/database.generated';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -233,7 +233,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
     }
   };
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = useCallback(async (file: File) => {
     try {
       const validation = validateImageFile(file);
       if (!validation.isValid) {
@@ -246,7 +246,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       }
 
       const imageUrl = await uploadMenuImage(storeId, file);
-      setNewMenu({ ...newMenu, image_url: imageUrl });
+      setNewMenu((prev) => ({ ...prev, image_url: imageUrl }));
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
       toast({
@@ -255,9 +255,9 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         variant: 'destructive',
       });
     }
-  };
+  }, [storeId, toast]);
 
-  const MenuForm = () => (
+  const MenuForm = useMemo(() => (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
         <label htmlFor="name" className="text-sm font-medium">
@@ -366,7 +366,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         </div>
       </div>
     </div>
-  );
+  ), [newMenu, categories, handleImageUpload]);
 
   return (
     <div className="space-y-4">
@@ -497,7 +497,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
             <DialogTitle>새 메뉴 추가</DialogTitle>
             <p className="text-sm text-gray-500">새로운 메뉴를 추가하세요.</p>
           </DialogHeader>
-          <MenuForm />
+          {MenuForm}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               취소
@@ -520,7 +520,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
             <DialogTitle>메뉴 수정</DialogTitle>
             <p className="text-sm text-gray-500">메뉴 정보를 수정하세요.</p>
           </DialogHeader>
-          <MenuForm />
+          {MenuForm}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               취소
