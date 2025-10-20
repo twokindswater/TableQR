@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Loader2, GripVertical, Pencil, Trash } from 'lucide-react';
 import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableItem } from './sortable-item';
+import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type Category = Tables<'categories'>;
 
@@ -49,14 +49,20 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
+    console.log('Drag end:', { active: active.id, over: over?.id });
+    
     if (!over || active.id === over.id) {
+      console.log('Drag cancelled or same position');
       return;
     }
 
     const oldIndex = categories.findIndex((cat) => cat.category_id === active.id);
     const newIndex = categories.findIndex((cat) => cat.category_id === over.id);
     
+    console.log('Indexes:', { oldIndex, newIndex });
+    
     if (oldIndex === -1 || newIndex === -1) {
+      console.log('Invalid indexes');
       return;
     }
 
@@ -70,9 +76,14 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
         display_order: index,
       }));
 
-      const { error } = await supabase
+      console.log('Updating categories:', updates);
+
+      const { data, error } = await supabase
         .from('categories')
-        .upsert(updates, { onConflict: 'category_id' });
+        .upsert(updates, { onConflict: 'category_id' })
+        .select();
+
+      console.log('Supabase response:', { data, error });
 
       if (error) throw error;
 
@@ -203,10 +214,32 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext items={categories.map(cat => cat.category_id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
-            {categories.map((category) => (
-              <SortableItem key={category.category_id} id={category.category_id}>
-                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group">
-                  <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
+            {categories.map((category) => {
+              const {
+                attributes,
+                listeners,
+                setNodeRef,
+                transform,
+                transition,
+                isDragging,
+              } = useSortable({ id: category.category_id });
+
+              const style = {
+                transform: CSS.Transform.toString(transform),
+                transition,
+                opacity: isDragging ? 0.5 : 1,
+              };
+
+              return (
+                <div 
+                  key={category.category_id}
+                  ref={setNodeRef} 
+                  style={style}
+                  className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group"
+                >
+                  <div {...attributes} {...listeners} className="cursor-move">
+                    <GripVertical className="w-5 h-5 text-gray-400" />
+                  </div>
                   <span className="flex-1">{category.name}</span>
                   <Button
                     variant="ghost"
@@ -247,8 +280,8 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-              </SortableItem>
-            ))}
+              );
+            })}
           </div>
         </SortableContext>
       </DndContext>
