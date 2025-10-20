@@ -70,9 +70,9 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
       setLoading(true);
       const newCategories = arrayMove(categories, oldIndex, newIndex);
       
-      // 순서 업데이트
+      // 순서 업데이트 - 전체 객체를 사용하되 display_order만 변경
       const updates = newCategories.map((category, index) => ({
-        category_id: category.category_id,
+        ...category,
         display_order: index,
       }));
 
