@@ -235,16 +235,17 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                   key={category.category_id}
                   ref={setNodeRef} 
                   style={style}
-                  className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group"
+                  {...attributes}
+                  {...listeners}
+                  className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group cursor-move"
                 >
-                  <div {...attributes} {...listeners} className="cursor-move">
-                    <GripVertical className="w-5 h-5 text-gray-400" />
-                  </div>
+                  <GripVertical className="w-5 h-5 text-gray-400" />
                   <span className="flex-1">{category.name}</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedCategory(category);
                       setNewCategory({
                         name: category.name,
@@ -252,12 +253,18 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                       });
                       setIsEditDialogOpen(true);
                     }}
+                    onPointerDown={(e) => e.stopPropagation()}
                   >
                     <Pencil className="w-4 h-4" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
                         <Trash className="w-4 h-4" />
                       </Button>
                     </AlertDialogTrigger>
