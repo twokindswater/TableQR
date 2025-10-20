@@ -8,6 +8,8 @@ import { Tables } from '@/types/database.generated';
 import { Loader2 } from 'lucide-react';
 import { CategoryList } from '@/components/menus/category-list';
 import { MenuList } from '@/components/menus/menu-list';
+import { QueuePanel } from '@/components/queues/queue-panel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Store = Tables<'stores'>;
 type Category = Tables<'categories'>;
@@ -104,29 +106,46 @@ export default function StoreDashboardPage() {
         </div>
       </div>
 
-      {/* 카테고리 및 메뉴 관리 섹션 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* 카테고리 목록 */}
-        <div className="md:col-span-1 bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4">카테고리</h2>
-          <CategoryList
-            storeId={store.store_id}
-            categories={categories}
-            onCategoriesChange={setCategories}
-          />
-        </div>
+      {/* 탭 섹션 */}
+      <Tabs defaultValue="menu" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="menu">메뉴 관리</TabsTrigger>
+          <TabsTrigger value="queue">주문 관리</TabsTrigger>
+        </TabsList>
 
-        {/* 메뉴 목록 */}
-        <div className="md:col-span-3 bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4">메뉴</h2>
-          <MenuList
-            storeId={store.store_id}
-            menus={menus}
-            categories={categories}
-            onMenusChange={setMenus}
-          />
-        </div>
-      </div>
+        {/* 메뉴 관리 탭 */}
+        <TabsContent value="menu" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* 카테고리 목록 */}
+            <div className="md:col-span-1 bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-bold mb-4">카테고리</h2>
+              <CategoryList
+                storeId={store.store_id}
+                categories={categories}
+                onCategoriesChange={setCategories}
+              />
+            </div>
+
+            {/* 메뉴 목록 */}
+            <div className="md:col-span-3 bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-bold mb-4">메뉴</h2>
+              <MenuList
+                storeId={store.store_id}
+                menus={menus}
+                categories={categories}
+                onMenusChange={setMenus}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* 주문 관리 탭 */}
+        <TabsContent value="queue" className="mt-6">
+          <div className="bg-white rounded-lg shadow p-6 min-h-[600px]">
+            <QueuePanel storeId={store.store_id} />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
