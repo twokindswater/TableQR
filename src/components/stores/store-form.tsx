@@ -96,6 +96,7 @@ export function StoreForm({
           .from('store-logos')
           .getPublicUrl(fileName);
 
+        console.log('업로드된 이미지 URL:', publicUrl);
         setValue('logo_url', publicUrl);
       } catch (error) {
         console.error('로고 업로드 실패:', error);
@@ -169,7 +170,6 @@ export function StoreForm({
                   id="logo"
                   type="file"
                   accept="image/*"
-                  {...register('logo_url')}
                   onChange={handleLogoChange}
                   disabled={loading}
                   className="cursor-pointer"
