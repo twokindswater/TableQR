@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Cropper from 'react-easy-crop';
 import { Area } from 'react-easy-crop';
 import {
@@ -32,8 +32,16 @@ export function ImageCropDialog({
   cropShape = 'rect',
 }: ImageCropDialogProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.8);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+
+  // 다이얼로그가 열릴 때마다 초기화
+  useEffect(() => {
+    if (open) {
+      setCrop({ x: 0, y: 0 });
+      setZoom(0.8);
+    }
+  }, [open]);
 
   const onCropChange = (crop: { x: number; y: number }) => {
     setCrop(crop);
@@ -117,7 +125,7 @@ export function ImageCropDialog({
             <Slider
               value={[zoom]}
               onValueChange={(value) => setZoom(value[0])}
-              min={1}
+              min={0.5}
               max={3}
               step={0.1}
               className="w-full"
