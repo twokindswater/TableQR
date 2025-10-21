@@ -96,7 +96,7 @@ export default function StoreDashboardPage() {
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{store.name}</h1>
-            <p className="text-gray-500">{store.description}</p>
+            <p className="text-gray-500 whitespace-pre-wrap">{store.description}</p>
           </div>
           <QRCodeDialog storeId={store.store_id} storeName={store.name} />
         </div>
@@ -107,9 +107,15 @@ export default function StoreDashboardPage() {
           </div>
           <div>
             <p className="text-sm text-gray-500">영업시간</p>
-            <p>{store.business_hours || '-'}</p>
+            <p className="whitespace-pre-wrap">{store.business_hours || '-'}</p>
           </div>
         </div>
+        {store.notice && (
+          <div className="mt-4 pt-4 border-t">
+            <p className="text-sm text-gray-500 mb-2">주의사항</p>
+            <p className="whitespace-pre-wrap">{store.notice}</p>
+          </div>
+        )}
       </div>
 
       {/* 탭 섹션 */}
@@ -155,3 +161,4 @@ export default function StoreDashboardPage() {
     </div>
   );
 }
+
