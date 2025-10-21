@@ -116,21 +116,43 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     try {
       setActionLoading(true);
 
-      // 최신 주문번호 조회
-      const { data: latestQueue } = await supabase
+      // 랜덤 3자리 숫자 생성 함수 (1-999)
+      const generateRandomNumber = () => Math.floor(Math.random() * 999) + 1;
+
+      // 기존 주문번호 조회
+      const { data: existingQueues } = await supabase
         .from('queues')
         .select('queue_number')
-        .eq('store_id', storeId)
-        .order('queue_number', { ascending: false })
-        .limit(1);
+        .eq('store_id', storeId);
 
-      // 다음 번호 생성
-      const nextNumber = latestQueue?.[0]?.queue_number 
-        ? latestQueue[0].queue_number + 1 
-        : 1;
+      const existingNumbers = new Set(
+        existingQueues?.map((q) => q.queue_number) || []
+      );
 
-      // 999 초과 시 1로 리셋
-      const queueNumber = nextNumber > 999 ? 1 : nextNumber;
+      // 중복되지 않는 랜덤 번호 찾기 (최대 100번 시도)
+      let queueNumber = generateRandomNumber();
+      let attempts = 0;
+      const maxAttempts = 100;
+
+      while (existingNumbers.has(queueNumber) && attempts < maxAttempts) {
+        queueNumber = generateRandomNumber();
+        attempts++;
+      }
+
+      // 100번 시도 후에도 중복이면 사용 가능한 번호 찾기
+      if (existingNumbers.has(queueNumber)) {
+        for (let i = 1; i <= 999; i++) {
+          if (!existingNumbers.has(i)) {
+            queueNumber = i;
+            break;
+          }
+        }
+      }
+
+      // 모든 번호가 사용 중이면 에러
+      if (existingNumbers.has(queueNumber)) {
+        throw new Error('사용 가능한 주문번호가 없습니다.');
+      }
 
       // 새 주문 생성
       const { error } = await supabase
@@ -142,7 +164,7 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
         });
 
       if (error) {
-        // 중복 시 재시도
+        // 중복 시 재시도 (드물지만 동시 요청의 경우)
         if (error.code === '23505') {
           return handleGenerateQueue();
         }
@@ -157,7 +179,7 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
       console.error('주문번호 생성 실패:', error);
       toast({
         title: '오류',
-        description: '주문번호 생성에 실패했습니다.',
+        description: error instanceof Error ? error.message : '주문번호 생성에 실패했습니다.',
         variant: 'destructive',
       });
     } finally {

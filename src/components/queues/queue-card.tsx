@@ -91,10 +91,13 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
 
       {/* 시간 정보 */}
       <div className="space-y-1 mb-4 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">대기 시간:</span>
-          <span className="font-semibold">{waitingTime}</span>
-        </div>
+        {/* 완료 상태가 아닐 때만 대기 시간 표시 */}
+        {queue.status !== 2 && (
+          <div className="flex justify-between">
+            <span className="text-gray-600">대기 시간:</span>
+            <span className="font-semibold">{waitingTime}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-gray-600">생성:</span>
           <span className="text-gray-500">{formatTime(queue.created_at)}</span>
