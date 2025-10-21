@@ -101,13 +101,13 @@ export function StoreForm({
       setLoading(true);
 
       // Blob을 File로 변환
-      const fileName = `${Date.now()}.jpg`;
+      const prefix = cropType === 'logo' ? 'logo' : 'cover';
+      const fileName = `${prefix}-${Date.now()}.jpg`;
       const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
 
-      // Supabase Storage에 업로드
-      const bucket = cropType === 'logo' ? 'store-logos' : 'store-covers';
+      // Supabase Storage에 업로드 (모두 store-logos 버킷 사용)
       const { data, error } = await supabase.storage
-        .from(bucket)
+        .from('store-logos')
         .upload(fileName, file);
 
       if (error) {
@@ -117,7 +117,7 @@ export function StoreForm({
       // 업로드된 파일의 공개 URL 가져오기
       const {
         data: { publicUrl },
-      } = supabase.storage.from(bucket).getPublicUrl(fileName);
+      } = supabase.storage.from('store-logos').getPublicUrl(fileName);
 
       // 미리보기 및 폼 값 업데이트
       if (cropType === 'logo') {
