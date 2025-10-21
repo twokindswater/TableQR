@@ -65,9 +65,9 @@ export function QRCodeDialog({ storeId, storeName }: QRCodeDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>주문 QR 코드</DialogTitle>
+          <DialogTitle>QR Code</DialogTitle>
           <DialogDescription>
-            고객이 스캔하여 주문할 수 있는 QR 코드입니다.
+            고객이 스캔하여 접속할 수 있는 QR 코드입니다.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center space-y-4 py-4">
