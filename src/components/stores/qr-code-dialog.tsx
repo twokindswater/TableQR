@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { Download, QrCode } from 'lucide-react';
 import {
@@ -20,13 +20,13 @@ interface QRCodeDialogProps {
 
 export function QRCodeDialog({ storeId, storeName }: QRCodeDialogProps) {
   const [open, setOpen] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const qrUrl = `https://tableqr-web.vercel.app/store/${storeId}`;
 
   useEffect(() => {
-    if (open && canvasRef.current) {
-      QRCode.toCanvas(
-        canvasRef.current,
+    if (open) {
+      // QR 코드를 Data URL로 생성
+      QRCode.toDataURL(
         qrUrl,
         {
           width: 300,
@@ -35,22 +35,22 @@ export function QRCodeDialog({ storeId, storeName }: QRCodeDialogProps) {
             dark: '#000000',
             light: '#FFFFFF',
           },
-        },
-        (error) => {
-          if (error) {
-            console.error('QR 코드 생성 실패:', error);
-          }
         }
-      );
+      )
+        .then((url) => {
+          setQrCodeUrl(url);
+        })
+        .catch((error) => {
+          console.error('QR 코드 생성 실패:', error);
+        });
     }
   }, [open, qrUrl]);
 
   const handleDownload = () => {
-    if (canvasRef.current) {
-      const url = canvasRef.current.toDataURL('image/png');
+    if (qrCodeUrl) {
       const link = document.createElement('a');
       link.download = `${storeName || 'store'}-qr-code.png`;
-      link.href = url;
+      link.href = qrCodeUrl;
       link.click();
     }
   };
@@ -72,13 +72,19 @@ export function QRCodeDialog({ storeId, storeName }: QRCodeDialogProps) {
         </DialogHeader>
         <div className="flex flex-col items-center space-y-4 py-4">
           <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-            <canvas ref={canvasRef} />
+            {qrCodeUrl ? (
+              <img src={qrCodeUrl} alt="QR Code" className="w-[300px] h-[300px]" />
+            ) : (
+              <div className="w-[300px] h-[300px] flex items-center justify-center">
+                <p className="text-gray-400">QR 코드 생성 중...</p>
+              </div>
+            )}
           </div>
           <div className="text-center space-y-2">
             <p className="text-sm font-medium">{storeName || '스토어'}</p>
             <p className="text-xs text-gray-500 break-all px-4">{qrUrl}</p>
           </div>
-          <Button onClick={handleDownload} className="w-full">
+          <Button onClick={handleDownload} className="w-full" disabled={!qrCodeUrl}>
             <Download className="w-4 h-4 mr-2" />
             QR 코드 다운로드
           </Button>
