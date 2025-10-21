@@ -16,6 +16,7 @@ import Image from 'next/image';
 import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
 import { SortableItem } from './sortable-item';
+import { ImageCropDialog } from '@/components/stores/image-crop-dialog';
 
 type Menu = Tables<'menus'>;
 type Category = Tables<'categories'>;
@@ -40,6 +41,9 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
     category_id: '',
     image_url: '',
   });
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState('');
+  const [cropTarget, setCropTarget] = useState<'new' | 'edit'>('new');
 
   // 드래그 앤 드롭을 위한 센서 설정
   const sensors = useSensors(
@@ -233,8 +237,9 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
     }
   };
 
-  const handleImageUpload = useCallback(async (file: File) => {
-    try {
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>, target: 'new' | 'edit') => {
+    const file = e.target.files?.[0];
+    if (file) {
       const validation = validateImageFile(file);
       if (!validation.isValid) {
         toast({
@@ -245,8 +250,38 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         return;
       }
 
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCropImageSrc(reader.result as string);
+        setCropTarget(target);
+        setCropDialogOpen(true);
+      };
+      reader.readAsDataURL(file);
+      // 파일 입력 초기화
+      e.target.value = '';
+    }
+  }, [toast]);
+
+  const handleCropComplete = useCallback(async (croppedBlob: Blob) => {
+    try {
+      setLoading(true);
+
+      // Blob을 File로 변환
+      const fileName = `menu-${Date.now()}.jpg`;
+      const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
+
       const imageUrl = await uploadMenuImage(storeId, file);
-      setNewMenu((prev) => ({ ...prev, image_url: imageUrl }));
+
+      if (cropTarget === 'new') {
+        setNewMenu((prev) => ({ ...prev, image_url: imageUrl }));
+      } else if (selectedMenu) {
+        setSelectedMenu({ ...selectedMenu, image_url: imageUrl });
+      }
+
+      toast({
+        title: '업로드 성공',
+        description: '이미지가 성공적으로 업로드되었습니다.',
+      });
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
       toast({
@@ -254,8 +289,10 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         description: '이미지 업로드에 실패했습니다.',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
-  }, [storeId, toast]);
+  }, [storeId, cropTarget, selectedMenu, toast]);
 
   const MenuForm = useMemo(() => (
     <div className="space-y-4 py-4">
@@ -346,10 +383,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file);
-                }}
+                onChange={(e) => handleImageSelect(e, 'new')}
                 id="image-upload"
               />
               <label
@@ -366,7 +400,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         </div>
       </div>
     </div>
-  ), [newMenu, categories, handleImageUpload]);
+  ), [newMenu, categories, handleImageSelect]);
 
   return (
     <div className="space-y-4">
@@ -535,6 +569,16 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 이미지 크롭 다이얼로그 */}
+      <ImageCropDialog
+        open={cropDialogOpen}
+        imageSrc={cropImageSrc}
+        onClose={() => setCropDialogOpen(false)}
+        onCropComplete={handleCropComplete}
+        aspectRatio={16 / 9}
+        cropShape="rect"
+      />
     </div>
   );
 }
