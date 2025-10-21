@@ -195,10 +195,11 @@ export function StoreForm({
           {/* 영업시간 */}
           <div className="space-y-2">
             <Label htmlFor="business_hours">영업시간</Label>
-            <Input
+            <Textarea
               id="business_hours"
               {...register('business_hours')}
-              placeholder="09:00 - 22:00"
+              placeholder="월-금: 09:00 - 22:00&#10;토-일: 10:00 - 20:00"
+              rows={3}
               disabled={loading}
             />
           </div>
