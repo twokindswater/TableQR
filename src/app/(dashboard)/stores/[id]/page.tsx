@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { CategoryList } from '@/components/menus/category-list';
 import { MenuList } from '@/components/menus/menu-list';
 import { QueuePanel } from '@/components/queues/queue-panel';
+import { QRCodeDialog } from '@/components/stores/qr-code-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Store = Tables<'stores'>;
@@ -92,9 +93,14 @@ export default function StoreDashboardPage() {
     <div className="container mx-auto py-6 space-y-8">
       {/* 스토어 정보 */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold">{store.name}</h1>
-        <p className="text-gray-500">{store.description}</p>
-        <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{store.name}</h1>
+            <p className="text-gray-500">{store.description}</p>
+          </div>
+          <QRCodeDialog storeId={store.store_id} storeName={store.name} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-500">연락처</p>
             <p>{store.phone || '-'}</p>
