@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Queue, FilteredQueues } from '@/types/queue';
+import { Queue, FilteredQueues, QueueNotification } from '@/types/queue';
 import { QueueCard } from './queue-card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,205 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
   const [queues, setQueues] = useState<Queue[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  type NotificationStatus = 'success' | 'failure';
+
+  const fetchQueueNotificationRecipients = useCallback(
+    async (queueNumber: number): Promise<Pick<QueueNotification, 'id' | 'fcm_token'>[]> => {
+      const { data, error } = await supabase
+        .from('queue_notifications')
+        .select('id, fcm_token')
+        .eq('store_id', storeId)
+        .eq('queue_number', queueNumber)
+        .not('fcm_token', 'is', null);
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as Pick<QueueNotification, 'id' | 'fcm_token'>[] | null) ?? [];
+    },
+    [storeId]
+  );
+
+  const updateNotificationStatus = useCallback(
+    async (ids: number[], status: NotificationStatus, timestamp: string) => {
+      if (ids.length === 0) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from('queue_notifications')
+        .update({
+          send_status: status,
+          notified_at: timestamp,
+        })
+        .in('id', ids);
+
+      if (error) {
+        console.error('알림 상태 업데이트 실패:', error);
+      }
+    },
+    []
+  );
+
+  const buildReadyNotificationPayload = useCallback(
+    (tokens: string[], queueNumber: number) => {
+      const formattedQueueNumber = String(queueNumber).padStart(3, '0');
+
+      return {
+        tokens,
+        notification: {
+          title: '주문 준비 완료',
+          body: `#${formattedQueueNumber} 주문이 준비되었습니다.`,
+          sound: 'default',
+        },
+        data: {
+          queueNumber: String(queueNumber),
+          storeId: String(storeId),
+        },
+        android: {
+          notification: {
+            sound: 'default',
+            default_vibrate_timings: true,
+            default_sound: true,
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+            },
+          },
+        },
+        webpush: {
+          headers: {
+            Urgency: 'high',
+          },
+          notification: {
+            vibrate: [200, 100, 200, 100, 200],
+            renotify: true,
+            requireInteraction: true,
+            sound: 'default',
+            tag: `queue-ready-${formattedQueueNumber}`,
+          },
+        },
+      };
+    },
+    [storeId]
+  );
+
+  const sendFcmReadyNotification = useCallback(async (payload: Record<string, unknown>) => {
+    const response = await fetch('/api/notifications/fcm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const rawBody = await response.text();
+    let parsedBody: Record<string, unknown> | null = null;
+
+    if (rawBody) {
+      try {
+        parsedBody = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch (error) {
+        console.warn('FCM 응답 파싱 실패:', error);
+      }
+    }
+
+    if (!response.ok) {
+      const fallbackMessage = rawBody || 'FCM 요청이 실패했습니다.';
+      const extractedMessage = parsedBody
+        ? (parsedBody as { error?: unknown; message?: unknown; details?: unknown }).error ??
+          (parsedBody as { message?: unknown }).message ??
+          (parsedBody as { details?: unknown }).details
+        : null;
+
+      const message = typeof extractedMessage === 'string' && extractedMessage.trim()
+        ? extractedMessage.trim()
+        : fallbackMessage;
+
+      throw new Error(message);
+    }
+
+    const result = (parsedBody?.result as Record<string, unknown> | undefined) ?? parsedBody;
+    const failureCount = Number((result as { failure?: unknown })?.failure ?? 0);
+
+    return {
+      failureCount: Number.isFinite(failureCount) ? failureCount : 0,
+    };
+  }, []);
+
+  // 준비 완료 푸시 알림 전송
+  const sendReadyNotification = useCallback(
+    async (queueNumber: number | null) => {
+      if (!queueNumber) {
+        return;
+      }
+
+      let recipients: Pick<QueueNotification, 'id' | 'fcm_token'>[] = [];
+      const attemptTimestamp = new Date().toISOString();
+
+      try {
+        recipients = await fetchQueueNotificationRecipients(queueNumber);
+
+        if (recipients.length === 0) {
+          return;
+        }
+
+        const tokens = recipients
+          .map(({ fcm_token }) => fcm_token)
+          .filter((token): token is string => Boolean(token));
+
+        if (tokens.length === 0) {
+          return;
+        }
+
+        const payload = buildReadyNotificationPayload(tokens, queueNumber);
+        const { failureCount } = await sendFcmReadyNotification(payload);
+        const status: NotificationStatus = failureCount > 0 ? 'failure' : 'success';
+
+        await updateNotificationStatus(
+          recipients.map(({ id }) => id),
+          status,
+          attemptTimestamp,
+        );
+
+        if (status === 'failure') {
+          toast({
+            title: '푸시 알림 일부 실패',
+            description: '일부 푸시 알림이 실패했습니다. 재시도 목록을 확인하세요.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('준비 완료 알림 전송 실패:', error);
+
+        if (recipients.length > 0) {
+          await updateNotificationStatus(
+            recipients.map(({ id }) => id),
+            'failure',
+            attemptTimestamp,
+          );
+        }
+
+        toast({
+          title: '알림 전송 실패',
+          description: '푸시 알림 전송에 실패했습니다. 로그를 확인해주세요.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [
+      buildReadyNotificationPayload,
+      fetchQueueNotificationRecipients,
+      sendFcmReadyNotification,
+      toast,
+      updateNotificationStatus,
+    ]
+  );
 
   // Queue 데이터 로드
   const loadQueues = useCallback(async () => {
@@ -189,6 +388,8 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
 
   // 준비 완료로 변경
   const handleMarkReady = async (queueId: number) => {
+    const targetQueue = queues.find((queue) => queue.queue_id === queueId);
+
     try {
       setActionLoading(true);
       const { error } = await supabase
@@ -200,6 +401,10 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
         .eq('queue_id', queueId);
 
       if (error) throw error;
+
+      if (targetQueue?.queue_number) {
+        sendReadyNotification(targetQueue.queue_number);
+      }
 
       toast({
         title: '성공',
@@ -408,4 +613,3 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     </div>
   );
 }
-

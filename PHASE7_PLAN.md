@@ -33,6 +33,8 @@
 - **기능**:
   - 주문 카드 클릭 시 액션 메뉴 표시
   - "준비 완료" 버튼 → status를 1로 변경
+- 준비 완료 시 `queue_notifications` 토큰 기반으로 FCM 푸시(사운드/진동) 발송
+  - `queue_notifications`의 `send_status`, `notified_at`를 업데이트하여 재시도 대상 관리
   - "완료" 버튼 → status를 2로 변경
   - "삭제" 버튼 → 레코드 삭제
   - 상태 변경 시 시각적 피드백
@@ -480,6 +482,7 @@ async function handleDelete(queueId: number) {
 4. 카드 색상이 파란색으로 변경
 5. "준비 완료" 섹션으로 이동
 6. 버튼이 [완료] [삭제]로 변경
+7. 등록된 토큰이 있으면 FCM 푸시가 사운드/진동과 함께 도착하는지 확인
 ```
 
 ### 3. 주문 완료
@@ -631,4 +634,3 @@ interface FilteredQueues {
 - UI/UX 개선: 2-3시간
 - 테스트 및 버그 수정: 2-3시간
 - **총 예상 시간: 10-15시간**
-
