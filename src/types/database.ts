@@ -61,6 +61,24 @@ export interface QRCode {
 export type QRCodeInsert = Omit<QRCode, 'qr_id' | 'created_at'>
 export type QRCodeUpdate = Partial<QRCodeInsert>
 
+// Queue Notification Types
+export interface QueueNotification {
+  id: number
+  store_id: number
+  queue_number: number
+  fcm_token: string
+  created_at: string
+  send_status: string | null
+  notified_at: string | null
+}
+
+export type QueueNotificationInsert = Omit<QueueNotification, 'id' | 'created_at' | 'send_status' | 'notified_at'> & {
+  created_at?: string
+  send_status?: string | null
+  notified_at?: string | null
+}
+export type QueueNotificationUpdate = Partial<QueueNotificationInsert>
+
 // Account Types (기존 accounts 테이블 - users 역할)
 export interface Account {
   account_id: number
@@ -103,6 +121,12 @@ export type Database = {
         Row: QRCode
         Insert: QRCodeInsert
         Update: QRCodeUpdate
+        Relationships: []
+      }
+      queue_notifications: {
+        Row: QueueNotification
+        Insert: QueueNotificationInsert
+        Update: QueueNotificationUpdate
         Relationships: []
       }
       accounts: {

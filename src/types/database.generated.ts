@@ -212,6 +212,44 @@ export type Database = {
           },
         ]
       }
+      queue_notifications: {
+        Row: {
+          created_at: string
+          fcm_token: string
+          id: number
+          notified_at: string | null
+          queue_number: number
+          send_status: string | null
+          store_id: number
+        }
+        Insert: {
+          created_at?: string
+          fcm_token: string
+          id?: number
+          notified_at?: string | null
+          queue_number: number
+          send_status?: string | null
+          store_id: number
+        }
+        Update: {
+          created_at?: string
+          fcm_token?: string
+          id?: number
+          notified_at?: string | null
+          queue_number?: number
+          send_status?: string | null
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "queue_notifications_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["store_id"]
+          },
+        ]
+      }
       stores: {
         Row: {
           address: string | null

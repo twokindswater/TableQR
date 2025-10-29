@@ -1,4 +1,4 @@
-import { Tables } from './database.generated';
+import { Tables, TablesInsert, TablesUpdate } from './database.generated';
 
 // Queue 테이블 타입
 export type Queue = Tables<'queues'>;
@@ -19,6 +19,11 @@ export type QueueUpdate = {
   called_at?: string;
   completed_at?: string;
 };
+
+// Queue 알림 토큰 타입
+export type QueueNotification = Tables<'queue_notifications'>;
+export type QueueNotificationInsert = TablesInsert<'queue_notifications'>;
+export type QueueNotificationUpdate = TablesUpdate<'queue_notifications'>;
 
 // 상태별 필터링된 Queue
 export interface FilteredQueues {
@@ -60,4 +65,3 @@ export const QUEUE_STATUS_MAP: Record<QueueStatus, QueueStatusInfo> = {
     icon: '✔️',
   },
 };
-
