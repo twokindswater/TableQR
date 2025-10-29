@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import admin from '@/lib/firebase-admin';
+import { MulticastMessage } from 'firebase-admin/messaging';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -15,15 +17,11 @@ interface FcmRequestBody {
   webpush?: AnyRecord;
 }
 
-const DEFAULT_FCM_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
-const FCM_ENDPOINT = process.env.FCM_ENDPOINT || DEFAULT_FCM_ENDPOINT;
-
 export async function POST(request: Request) {
-  const serverKey = process.env.FCM_SERVER_KEY;
-
-  if (!serverKey) {
+  // Admin SDK가 초기화되었는지 확인
+  if (!admin.apps.length) {
     return NextResponse.json(
-      { error: 'FCM_SERVER_KEY is not configured' },
+      { error: 'Firebase Admin SDK is not initialized' },
       { status: 500 }
     );
   }
@@ -42,39 +40,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No tokens provided' }, { status: 400 });
   }
 
-  const payload = {
-    registration_ids: tokens,
+  // Admin SDK의 MulticastMessage 타입에 맞게 페이로드 구성
+  const message: MulticastMessage = {
+    tokens,
     notification: {
       title: body.notification?.title ?? '주문 준비 완료',
       body: body.notification?.body ?? '주문이 준비되었습니다.',
-      sound: body.notification?.sound ?? 'default',
     },
     data: body.data ?? {},
     android: mergeAndroid(body.android),
     apns: mergeApns(body.apns),
     webpush: mergeWebpush(body.webpush),
   };
-
-  const response = await fetch(FCM_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `key=${serverKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
+  
+  try {
+    const response = await admin.messaging().sendEachForMulticast(message);
+    // sendMulticast에서 sendEachForMulticast로 변경하여 개별 결과를 더 잘 처리합니다.
+    // 실패한 토큰만 필터링하여 클라이언트에게 더 유용한 정보를 제공할 수 있습니다.
+    const failedTokens = response.responses
+      .map((resp, idx) => (resp.success ? null : tokens[idx]))
+      .filter(Boolean);
+      
+    return NextResponse.json({ success: true, result: response, failedTokens });
+  } catch (error) {
+    console.error('FCM notification failed:', error);
     return NextResponse.json(
-      { error: 'Failed to send FCM notification', details: errorText },
-      { status: 502 }
+      { error: 'Failed to send FCM notification', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
     );
   }
-
-  const result = await response.json();
-
-  return NextResponse.json({ success: true, result });
 }
 
 function mergeAndroid(android?: AnyRecord) {
