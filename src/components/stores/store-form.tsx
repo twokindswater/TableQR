@@ -10,10 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { StoreInsert, Store } from '@/types/database';
 import { Upload, X } from 'lucide-react';
-import Image from 'next/image';
+import NextImage from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { ImageCropDialog } from './image-crop-dialog';
+
+type ImageType = 'logo' | 'cover';
 
 interface StoreFormProps {
   initialData?: Store;
@@ -23,6 +25,173 @@ interface StoreFormProps {
 }
 
 type StoreFormData = Omit<StoreInsert, 'user_id'>;
+
+const SUPABASE_BUCKET = 'store-logos';
+
+type ImageVariantDefinition = {
+  key: string;
+  width: number;
+  height: number;
+  quality?: number;
+};
+
+const IMAGE_VARIANTS: Record<ImageType, ImageVariantDefinition[]> = {
+  logo: [
+    { key: 'hero', width: 512, height: 512, quality: 0.92 },
+    { key: 'medium', width: 256, height: 256, quality: 0.88 },
+    { key: 'thumb', width: 128, height: 128, quality: 0.85 },
+  ],
+  cover: [
+    { key: 'hero', width: 1920, height: 1080, quality: 0.92 },
+    { key: 'large', width: 1280, height: 720, quality: 0.9 },
+    { key: 'medium', width: 960, height: 540, quality: 0.88 },
+    { key: 'thumb', width: 640, height: 360, quality: 0.85 },
+  ],
+};
+
+const IMAGE_ROOT_PATH: Record<ImageType, string> = {
+  logo: 'logos',
+  cover: 'covers',
+};
+
+const VARIANT_KEYS: Record<ImageType, string[]> = {
+  logo: IMAGE_VARIANTS.logo.map((variant) => variant.key),
+  cover: IMAGE_VARIANTS.cover.map((variant) => variant.key),
+};
+
+const HERO_VARIANT_KEY: Record<ImageType, string> = {
+  logo: 'hero',
+  cover: 'hero',
+};
+
+function createAssetId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function findStoragePathFromPublicUrl(url: string | null) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const marker = `${SUPABASE_BUCKET}/`;
+    const index = parsed.pathname.indexOf(marker);
+    if (index === -1) return null;
+    return parsed.pathname.slice(index + marker.length);
+  } catch (error) {
+    console.warn('Failed to parse storage path from URL:', error);
+    return null;
+  }
+}
+
+function deriveAssetBasePath(url: string | null, type: ImageType) {
+  const storagePath = findStoragePathFromPublicUrl(url);
+  if (!storagePath) return null;
+  const segments = storagePath.split('/');
+  const last = segments.pop();
+  if (!last) return null;
+  const variantName = last.replace('.jpg', '');
+  if (!VARIANT_KEYS[type].includes(variantName)) return null;
+  return segments.join('/');
+}
+
+async function removeExistingAsset(basePath: string | null, type: ImageType) {
+  if (!basePath) return;
+  const paths = VARIANT_KEYS[type].map((variant) => `${basePath}/${variant}.jpg`);
+  const { error } = await supabase.storage.from(SUPABASE_BUCKET).remove(paths);
+  if (error) {
+    console.warn('Failed to remove previous asset variants:', error);
+  }
+}
+
+async function loadImageFromBlob(blob: Blob) {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = document.createElement('img');
+      img.onload = () => resolve(img);
+      img.onerror = () =>
+        reject(new Error('Failed to load image for variant generation.'));
+      img.src = objectUrl;
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function createVariantBlob(
+  image: HTMLImageElement,
+  definition: ImageVariantDefinition
+) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    throw new Error(
+      'Canvas context unavailable while generating image variants.'
+    );
+  }
+
+  canvas.width = definition.width;
+  canvas.height = definition.height;
+
+  ctx.drawImage(image, 0, 0, definition.width, definition.height);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => {
+        if (result) {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to create variant blob.'));
+        }
+      },
+      'image/jpeg',
+      definition.quality
+    );
+  });
+
+  return blob;
+}
+
+async function uploadVariants(
+  sourceBlob: Blob,
+  type: ImageType,
+  assetBasePath: string
+) {
+  const variantDefinitions = IMAGE_VARIANTS[type];
+  const variantEntries: Array<[string, string]> = [];
+  const sourceImage = await loadImageFromBlob(sourceBlob);
+
+  for (const definition of variantDefinitions) {
+    const variantBlob = await createVariantBlob(sourceImage, definition);
+    const variantPath = `${assetBasePath}/${definition.key}.jpg`;
+    const variantFile = new File([variantBlob], `${definition.key}.jpg`, {
+      type: 'image/jpeg',
+    });
+
+    const { error } = await supabase.storage
+      .from(SUPABASE_BUCKET)
+      .upload(variantPath, variantFile, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(variantPath);
+
+    variantEntries.push([definition.key, publicUrl]);
+  }
+
+  return Object.fromEntries(variantEntries) as Record<string, string>;
+}
 
 export function StoreForm({
   initialData,
@@ -40,6 +209,12 @@ export function StoreForm({
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState('');
   const [cropType, setCropType] = useState<'logo' | 'cover'>('logo');
+  const [logoAssetBasePath, setLogoAssetBasePath] = useState<string | null>(() =>
+    deriveAssetBasePath(initialData?.logo_url || null, 'logo')
+  );
+  const [coverAssetBasePath, setCoverAssetBasePath] = useState<string | null>(() =>
+    deriveAssetBasePath(initialData?.cover_url || null, 'cover')
+  );
   const { toast } = useToast();
 
   const {
@@ -97,35 +272,33 @@ export function StoreForm({
   };
 
   const handleCropComplete = async (croppedBlob: Blob) => {
+    const type: ImageType = cropType;
     try {
       setLoading(true);
 
-      // Blob을 File로 변환
-      const prefix = cropType === 'logo' ? 'logo' : 'cover';
-      const fileName = `${prefix}-${Date.now()}.jpg`;
-      const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
-
-      // Supabase Storage에 업로드 (모두 store-logos 버킷 사용)
-      const { data, error } = await supabase.storage
-        .from('store-logos')
-        .upload(fileName, file);
-
-      if (error) {
-        throw error;
+      if (type === 'logo') {
+        await removeExistingAsset(logoAssetBasePath, 'logo');
+      } else {
+        await removeExistingAsset(coverAssetBasePath, 'cover');
       }
 
-      // 업로드된 파일의 공개 URL 가져오기
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('store-logos').getPublicUrl(fileName);
+      const assetId = createAssetId();
+      const assetBasePath = `${IMAGE_ROOT_PATH[type]}/${assetId}`;
+      const variantUrls = await uploadVariants(croppedBlob, type, assetBasePath);
+      const heroUrl = variantUrls[HERO_VARIANT_KEY[type]];
 
-      // 미리보기 및 폼 값 업데이트
-      if (cropType === 'logo') {
-        setLogoPreview(publicUrl);
-        setValue('logo_url', publicUrl);
+      if (!heroUrl) {
+        throw new Error('대표 이미지 URL을 확인할 수 없습니다.');
+      }
+
+      if (type === 'logo') {
+        setLogoPreview(heroUrl);
+        setValue('logo_url', heroUrl);
+        setLogoAssetBasePath(assetBasePath);
       } else {
-        setCoverPreview(publicUrl);
-        setValue('cover_url', publicUrl);
+        setCoverPreview(heroUrl);
+        setValue('cover_url', heroUrl);
+        setCoverAssetBasePath(assetBasePath);
       }
 
       toast({
@@ -144,14 +317,34 @@ export function StoreForm({
     }
   };
 
-  const clearLogo = () => {
-    setLogoPreview(null);
-    setValue('logo_url', null);
+  const clearLogo = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      await removeExistingAsset(logoAssetBasePath, 'logo');
+      setLogoAssetBasePath(null);
+    } catch (error) {
+      console.error('로고 제거 실패:', error);
+    } finally {
+      setLoading(false);
+      setLogoPreview(null);
+      setValue('logo_url', null);
+    }
   };
 
-  const clearCover = () => {
-    setCoverPreview(null);
-    setValue('cover_url', null);
+  const clearCover = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      await removeExistingAsset(coverAssetBasePath, 'cover');
+      setCoverAssetBasePath(null);
+    } catch (error) {
+      console.error('커버 이미지 제거 실패:', error);
+    } finally {
+      setLoading(false);
+      setCoverPreview(null);
+      setValue('cover_url', null);
+    }
   };
 
   return (
@@ -184,7 +377,7 @@ export function StoreForm({
               {/* 로고 미리보기 */}
               {logoPreview && logoPreview.trim() !== '' ? (
                 <div className="relative w-32 h-32 border rounded-full overflow-hidden">
-                  <Image
+                  <NextImage
                     src={logoPreview}
                     alt="로고 미리보기"
                     fill
@@ -192,7 +385,9 @@ export function StoreForm({
                   />
                   <button
                     type="button"
-                    onClick={clearLogo}
+                    onClick={() => {
+                      void clearLogo();
+                    }}
                     className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                   >
                     <X className="w-4 h-4" />
@@ -228,7 +423,7 @@ export function StoreForm({
               {/* 커버 이미지 미리보기 */}
               {coverPreview && coverPreview.trim() !== '' ? (
                 <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
-                  <Image
+                  <NextImage
                     src={coverPreview}
                     alt="커버 이미지 미리보기"
                     fill
@@ -236,7 +431,9 @@ export function StoreForm({
                   />
                   <button
                     type="button"
-                    onClick={clearCover}
+                    onClick={() => {
+                      void clearCover();
+                    }}
                     className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                   >
                     <X className="w-4 h-4" />
@@ -259,7 +456,7 @@ export function StoreForm({
                   className="cursor-pointer"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  정사각형 이미지 권장 (PNG, JPG)
+                  16:9 비율 권장 (PNG, JPG)
                 </p>
               </div>
             </div>
@@ -346,7 +543,7 @@ export function StoreForm({
         imageSrc={cropImageSrc}
         onClose={() => setCropDialogOpen(false)}
         onCropComplete={handleCropComplete}
-        aspectRatio={1}
+        aspectRatio={cropType === 'logo' ? 1 : 16 / 9}
         cropShape={cropType === 'logo' ? 'round' : 'rect'}
       />
     </form>
