@@ -14,7 +14,7 @@ import {
   uploadMenuImage,
   deleteMenuImage,
   validateImageFile,
-  getMenuImageVariant,
+  getImageVariant,
 } from '@/lib/supabase-storage';
 import { Loader2, GripVertical, Pencil, Trash, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
@@ -418,10 +418,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
           {newMenu.image_url ? (
             <div className="relative aspect-video w-full overflow-hidden rounded-lg">
               <Image
-                src={
-                  getMenuImageVariant(newMenu.image_url, 'detail') ??
-                  newMenu.image_url
-                }
+                src={getImageVariant(newMenu.image_url, 'detail') ?? newMenu.image_url}
                 alt={newMenu.name || '메뉴 이미지'}
                 fill
                 className="object-cover"
@@ -482,8 +479,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                     {menu.image_url ? (
                       <Image
                         src={
-                          getMenuImageVariant(menu.image_url, 'card') ??
-                          menu.image_url
+                          getImageVariant(menu.image_url, 'card') ?? menu.image_url
                         }
                         alt={menu.name || ''}
                         fill
