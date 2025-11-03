@@ -22,9 +22,9 @@ export const IMAGE_VARIANT_CONFIG: Record<ImageKind, ImageKindConfig> = {
     heroKey: 'hero',
     rootPath: 'logos',
     variants: [
-      { key: 'hero', width: 512, height: 512, quality: 80, format: 'webp' },
-      { key: 'medium', width: 256, height: 256, quality: 75, format: 'webp' },
-      { key: 'thumb', width: 128, height: 128, quality: 70, format: 'webp' },
+      { key: 'hero', width: 256, height: 256, quality: 80, format: 'webp' },
+      { key: 'medium', width: 128, height: 128, quality: 75, format: 'webp' },
+      { key: 'thumb', width: 64, height: 64, quality: 70, format: 'webp' },
     ],
   },
   'store-cover': {
@@ -32,10 +32,10 @@ export const IMAGE_VARIANT_CONFIG: Record<ImageKind, ImageKindConfig> = {
     heroKey: 'hero',
     rootPath: 'covers',
     variants: [
-      { key: 'hero', width: 1920, height: 1080, quality: 82, format: 'webp' },
-      { key: 'large', width: 1280, height: 720, quality: 78, format: 'webp' },
-      { key: 'medium', width: 960, height: 540, quality: 75, format: 'webp' },
-      { key: 'thumb', width: 640, height: 360, quality: 72, format: 'webp' },
+      { key: 'hero', width: 640, height: 360, quality: 82, format: 'webp' },
+      { key: 'large', width: 960, height: 540, quality: 78, format: 'webp' },
+      { key: 'medium', width: 480, height: 270, quality: 75, format: 'webp' },
+      { key: 'thumb', width: 240, height: 135, quality: 72, format: 'webp' },
     ],
   },
   menu: {
@@ -43,10 +43,10 @@ export const IMAGE_VARIANT_CONFIG: Record<ImageKind, ImageKindConfig> = {
     heroKey: 'hero',
     groupByStoreId: true,
     variants: [
-      { key: 'hero', width: 1920, height: 1080, quality: 82, format: 'webp' },
-      { key: 'detail', width: 1280, height: 720, quality: 78, format: 'webp' },
-      { key: 'card', width: 960, height: 540, quality: 75, format: 'webp' },
-      { key: 'thumb', width: 480, height: 270, quality: 70, format: 'webp' },
+      { key: 'hero', width: 640, height: 360, quality: 82, format: 'webp' },
+      { key: 'detail', width: 960, height: 540, quality: 80, format: 'webp' },
+      { key: 'card', width: 480, height: 270, quality: 78, format: 'webp' },
+      { key: 'thumb', width: 96, height: 96, quality: 75, format: 'webp' },
     ],
   },
 };
