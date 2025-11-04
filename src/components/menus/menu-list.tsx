@@ -10,7 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { uploadMenuImage, deleteMenuImage, validateImageFile } from '@/lib/supabase-storage';
+import {
+  uploadMenuImage,
+  deleteMenuImage,
+  validateImageFile,
+  getImageVariant,
+} from '@/lib/supabase-storage';
 import { Loader2, GripVertical, Pencil, Trash, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -270,12 +275,20 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       const fileName = `menu-${Date.now()}.jpg`;
       const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
 
-      const imageUrl = await uploadMenuImage(storeId, file);
+      const existingUrl =
+        cropTarget === 'new'
+          ? newMenu.image_url || null
+          : selectedMenu?.image_url || null;
+
+      const { heroUrl } = await uploadMenuImage(storeId, file, existingUrl);
 
       if (cropTarget === 'new') {
-        setNewMenu((prev) => ({ ...prev, image_url: imageUrl }));
-      } else if (selectedMenu) {
-        setSelectedMenu({ ...selectedMenu, image_url: imageUrl });
+        setNewMenu((prev) => ({ ...prev, image_url: heroUrl }));
+      } else {
+        setNewMenu((prev) => ({ ...prev, image_url: heroUrl }));
+        setSelectedMenu((prev) =>
+          prev ? { ...prev, image_url: heroUrl } : prev
+        );
       }
 
       toast({
@@ -292,7 +305,49 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
     } finally {
       setLoading(false);
     }
-  }, [storeId, cropTarget, selectedMenu, toast]);
+  }, [storeId, cropTarget, newMenu.image_url, selectedMenu, toast]);
+
+  const handleRemoveImage = useCallback(
+    async (target: 'new' | 'edit') => {
+      const targetUrl =
+        target === 'new' ? newMenu.image_url || null : selectedMenu?.image_url || null;
+
+      if (!targetUrl) {
+        setNewMenu((prev) => ({ ...prev, image_url: '' }));
+        if (target === 'edit') {
+          setSelectedMenu((prev) =>
+            prev ? { ...prev, image_url: '' } : prev
+          );
+        }
+        return;
+      }
+
+      try {
+        setLoading(true);
+        await deleteMenuImage(targetUrl);
+        toast({
+          title: '삭제 완료',
+          description: '이미지가 삭제되었습니다.',
+        });
+      } catch (error) {
+        console.error('이미지 삭제 실패:', error);
+        toast({
+          title: '오류',
+          description: '이미지 삭제에 실패했습니다.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+        setNewMenu((prev) => ({ ...prev, image_url: '' }));
+        if (target === 'edit') {
+          setSelectedMenu((prev) =>
+            prev ? { ...prev, image_url: '' } : prev
+          );
+        }
+      }
+    },
+    [newMenu.image_url, selectedMenu, toast]
+  );
 
   const MenuForm = useMemo(() => (
     <div className="space-y-4 py-4">
@@ -363,7 +418,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
           {newMenu.image_url ? (
             <div className="relative aspect-video w-full overflow-hidden rounded-lg">
               <Image
-                src={newMenu.image_url}
+                src={getImageVariant(newMenu.image_url, 'detail') ?? newMenu.image_url}
                 alt={newMenu.name || '메뉴 이미지'}
                 fill
                 className="object-cover"
@@ -372,7 +427,10 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                 variant="destructive"
                 size="sm"
                 className="absolute top-2 right-2"
-                onClick={() => setNewMenu({ ...newMenu, image_url: '' })}
+                onClick={() => {
+                  void handleRemoveImage(selectedMenu ? 'edit' : 'new');
+                }}
+                disabled={loading}
               >
                 삭제
               </Button>
@@ -400,7 +458,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         </div>
       </div>
     </div>
-  ), [newMenu, categories, handleImageSelect]);
+  ), [newMenu, categories, handleImageSelect, handleRemoveImage, selectedMenu, loading]);
 
   return (
     <div className="space-y-4">
@@ -420,7 +478,9 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                   <div className="aspect-video bg-gray-100 relative">
                     {menu.image_url ? (
                       <Image
-                        src={menu.image_url}
+                        src={
+                          getImageVariant(menu.image_url, 'card') ?? menu.image_url
+                        }
                         alt={menu.name || ''}
                         fill
                         className="object-cover"

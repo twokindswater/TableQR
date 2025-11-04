@@ -10,10 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { StoreInsert, Store } from '@/types/database';
 import { Upload, X } from 'lucide-react';
-import Image from 'next/image';
-import { supabase } from '@/lib/supabase';
+import NextImage from 'next/image';
+import {
+  deleteStoreImage,
+  uploadStoreImage,
+} from '@/lib/supabase-storage';
 import { useToast } from '@/hooks/use-toast';
 import { ImageCropDialog } from './image-crop-dialog';
+
+type ImageType = 'logo' | 'cover';
 
 interface StoreFormProps {
   initialData?: Store;
@@ -99,33 +104,16 @@ export function StoreForm({
   const handleCropComplete = async (croppedBlob: Blob) => {
     try {
       setLoading(true);
+      const kind = cropType === 'logo' ? 'store-logo' : 'store-cover';
+      const previousUrl = cropType === 'logo' ? logoPreview : coverPreview;
+      const { heroUrl } = await uploadStoreImage(kind, croppedBlob, previousUrl);
 
-      // Blob을 File로 변환
-      const prefix = cropType === 'logo' ? 'logo' : 'cover';
-      const fileName = `${prefix}-${Date.now()}.jpg`;
-      const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
-
-      // Supabase Storage에 업로드 (모두 store-logos 버킷 사용)
-      const { data, error } = await supabase.storage
-        .from('store-logos')
-        .upload(fileName, file);
-
-      if (error) {
-        throw error;
-      }
-
-      // 업로드된 파일의 공개 URL 가져오기
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('store-logos').getPublicUrl(fileName);
-
-      // 미리보기 및 폼 값 업데이트
       if (cropType === 'logo') {
-        setLogoPreview(publicUrl);
-        setValue('logo_url', publicUrl);
+        setLogoPreview(heroUrl);
+        setValue('logo_url', heroUrl);
       } else {
-        setCoverPreview(publicUrl);
-        setValue('cover_url', publicUrl);
+        setCoverPreview(heroUrl);
+        setValue('cover_url', heroUrl);
       }
 
       toast({
@@ -144,14 +132,36 @@ export function StoreForm({
     }
   };
 
-  const clearLogo = () => {
-    setLogoPreview(null);
-    setValue('logo_url', null);
+  const clearLogo = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      if (logoPreview) {
+        await deleteStoreImage(logoPreview, 'store-logo');
+      }
+    } catch (error) {
+      console.error('로고 제거 실패:', error);
+    } finally {
+      setLoading(false);
+      setLogoPreview(null);
+      setValue('logo_url', null);
+    }
   };
 
-  const clearCover = () => {
-    setCoverPreview(null);
-    setValue('cover_url', null);
+  const clearCover = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      if (coverPreview) {
+        await deleteStoreImage(coverPreview, 'store-cover');
+      }
+    } catch (error) {
+      console.error('커버 이미지 제거 실패:', error);
+    } finally {
+      setLoading(false);
+      setCoverPreview(null);
+      setValue('cover_url', null);
+    }
   };
 
   return (
@@ -184,7 +194,7 @@ export function StoreForm({
               {/* 로고 미리보기 */}
               {logoPreview && logoPreview.trim() !== '' ? (
                 <div className="relative w-32 h-32 border rounded-full overflow-hidden">
-                  <Image
+                  <NextImage
                     src={logoPreview}
                     alt="로고 미리보기"
                     fill
@@ -192,7 +202,9 @@ export function StoreForm({
                   />
                   <button
                     type="button"
-                    onClick={clearLogo}
+                    onClick={() => {
+                      void clearLogo();
+                    }}
                     className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                   >
                     <X className="w-4 h-4" />
@@ -228,7 +240,7 @@ export function StoreForm({
               {/* 커버 이미지 미리보기 */}
               {coverPreview && coverPreview.trim() !== '' ? (
                 <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
-                  <Image
+                  <NextImage
                     src={coverPreview}
                     alt="커버 이미지 미리보기"
                     fill
@@ -236,7 +248,9 @@ export function StoreForm({
                   />
                   <button
                     type="button"
-                    onClick={clearCover}
+                    onClick={() => {
+                      void clearCover();
+                    }}
                     className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                   >
                     <X className="w-4 h-4" />
@@ -259,7 +273,7 @@ export function StoreForm({
                   className="cursor-pointer"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  정사각형 이미지 권장 (PNG, JPG)
+                  16:9 비율 권장 (PNG, JPG)
                 </p>
               </div>
             </div>
@@ -346,7 +360,7 @@ export function StoreForm({
         imageSrc={cropImageSrc}
         onClose={() => setCropDialogOpen(false)}
         onCropComplete={handleCropComplete}
-        aspectRatio={1}
+        aspectRatio={cropType === 'logo' ? 1 : 16 / 9}
         cropShape={cropType === 'logo' ? 'round' : 'rect'}
       />
     </form>

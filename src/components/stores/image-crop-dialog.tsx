@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import Cropper from 'react-easy-crop';
-import { Area } from 'react-easy-crop';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 
 interface ImageCropDialogProps {
   open: boolean;
@@ -31,61 +30,71 @@ export function ImageCropDialog({
   aspectRatio = 1,
   cropShape = 'rect',
 }: ImageCropDialogProps) {
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(0.8);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
 
   // 다이얼로그가 열릴 때마다 초기화
   useEffect(() => {
     if (open) {
-      setCrop({ x: 0, y: 0 });
-      setZoom(0.8);
+      setCrop(undefined);
+      setCompletedCrop(null);
     }
   }, [open]);
 
-  const onCropChange = (crop: { x: number; y: number }) => {
-    setCrop(crop);
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    const el = containerRef.current;
+    if (!el) return;
+    // 초기 crop을 컨테이너 가장자리에 맞춘 비율 박스 중앙 배치
+    const containerW = el.clientWidth;
+    const containerH = el.clientHeight;
+    const containerAspect = containerW / containerH;
+    let width: number;
+    let height: number;
+    if (containerAspect > aspectRatio) {
+      height = Math.round(containerH * 0.8);
+      width = Math.round(height * aspectRatio);
+    } else {
+      width = Math.round(containerW * 0.8);
+      height = Math.round(width / aspectRatio);
+    }
+    const x = Math.round((containerW - width) / 2);
+    const y = Math.round((containerH - height) / 2);
+    // react-image-crop expects coordinates in pixels when unit:'px'
+    setCrop({ unit: 'px', x, y, width, height });
   };
-
-  const onZoomChange = (zoom: number) => {
-    setZoom(zoom);
-  };
-
-  const onCropCompleteHandler = useCallback(
-    (croppedArea: Area, croppedAreaPixels: Area) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    []
-  );
 
   const createCroppedImage = async () => {
-    if (!croppedAreaPixels) return;
-
+    if (!imgRef.current || !completedCrop) return;
     try {
-      const image = await createImage(imageSrc);
+      const image = imgRef.current;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-
       if (!ctx) return;
 
-      // 캔버스 크기 설정
-      canvas.width = croppedAreaPixels.width;
-      canvas.height = croppedAreaPixels.height;
+      const scaleX = image.naturalWidth / image.width;
+      const scaleY = image.naturalHeight / image.height;
 
-      // 이미지 크롭
+      canvas.width = Math.floor(completedCrop.width * scaleX);
+      canvas.height = Math.floor(completedCrop.height * scaleY);
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
       ctx.drawImage(
         image,
-        croppedAreaPixels.x,
-        croppedAreaPixels.y,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height,
+        Math.floor(completedCrop.x * scaleX),
+        Math.floor(completedCrop.y * scaleY),
+        Math.floor(completedCrop.width * scaleX),
+        Math.floor(completedCrop.height * scaleY),
         0,
         0,
-        croppedAreaPixels.width,
-        croppedAreaPixels.height
+        Math.floor(completedCrop.width * scaleX),
+        Math.floor(completedCrop.height * scaleY)
       );
 
-      // Blob으로 변환
       canvas.toBlob((blob) => {
         if (blob) {
           onCropComplete(blob);
@@ -106,31 +115,27 @@ export function ImageCropDialog({
             이미지를 드래그하거나 줌을 조절하여 원하는 영역을 선택하세요.
           </DialogDescription>
         </DialogHeader>
-        <div className="relative h-[400px] w-full">
-          <Cropper
-            image={imageSrc}
+        <div ref={containerRef} className="relative h-[400px] w-full overflow-hidden">
+          <ReactCrop
+            className="h-full w-full"
+            style={{ height: '100%', maxHeight: '100%' }}
             crop={crop}
-            zoom={zoom}
+            onChange={(c) => setCrop(c)}
+            onComplete={(c) => setCompletedCrop(c)}
             aspect={aspectRatio}
-            cropShape={cropShape}
-            showGrid={true}
-            onCropChange={onCropChange}
-            onZoomChange={onZoomChange}
-            onCropComplete={onCropCompleteHandler}
-          />
-        </div>
-        <div className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">줌</label>
-            <Slider
-              value={[zoom]}
-              onValueChange={(value) => setZoom(value[0])}
-              min={0.5}
-              max={3}
-              step={0.1}
-              className="w-full"
+            keepSelection
+            locked={false}
+            ruleOfThirds
+          >
+            <img
+              ref={imgRef}
+              src={imageSrc}
+              alt="crop source"
+              onLoad={onImageLoad}
+              className="h-full w-full object-contain"
+              style={{ maxHeight: '100%', maxWidth: '100%' }}
             />
-          </div>
+          </ReactCrop>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -142,14 +147,3 @@ export function ImageCropDialog({
     </Dialog>
   );
 }
-
-// 이미지 로드 헬퍼 함수
-function createImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.addEventListener('load', () => resolve(image));
-    image.addEventListener('error', (error) => reject(error));
-    image.src = url;
-  });
-}
-
