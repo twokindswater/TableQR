@@ -1,17 +1,20 @@
 'use client'
 
 import { signIn } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams?.get("callbackUrl") || "/stores"
 
   const handleGoogleSignIn = async () => {
     try {
       await signIn("google", {
-        callbackUrl: "/stores",
+        callbackUrl,
       })
     } catch (error) {
       console.error("Login error:", error)
@@ -74,4 +77,3 @@ export default function LoginPage() {
     </div>
   )
 }
-

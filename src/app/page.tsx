@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Bell, Edit3, Globe, Laptop, QrCode } from "lucide-react"
+import { PricingSection } from "@/components/landing/pricing-section"
 
 const features = [
   {
@@ -35,36 +36,6 @@ const globalValues = [
   "언제든 수정, 바로 반영.",
   "언어 장벽 없이, 어디서나 통합니다.",
   "스마트폰으로 바로 접근하는 웹 메뉴판.",
-]
-
-const pricingPlans = [
-  {
-    tier: "Free",
-    price: "₩0 /월",
-    description: "소규모 매장을 위한 시작 플랜",
-    benefits: ["QR 메뉴 1개", "기본 통계", "브라우저 번역"],
-  },
-  {
-    tier: "Standard",
-    price: "₩29,000 /월",
-    description: "대부분의 매장에 적합한 핵심 기능",
-    benefits: [
-      "QR 메뉴 3개",
-      "대기/푸시 알림",
-      "실시간 메뉴 편집",
-    ],
-    highlight: true,
-  },
-  {
-    tier: "Pro",
-    price: "₩59,000 /월",
-    description: "체인점과 글로벌 매장을 위한 확장 기능",
-    benefits: [
-      "무제한 QR 메뉴",
-      "고급 분석 & 레포트",
-      "우선 지원",
-    ],
-  },
 ]
 
 const faqs = [
@@ -347,59 +318,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section
-        id="pricing"
-        className="border-b border-gray-100 bg-white"
-      >
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="mb-12 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-              Pricing
-            </p>
-            <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
-              매장 규모에 맞는 요금제를 선택하세요
-            </h2>
-          </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {pricingPlans.map((plan) => (
-              <div
-                key={plan.tier}
-                className={`rounded-3xl border p-8 transition hover:-translate-y-1 hover:shadow-lg ${
-                  plan.highlight
-                    ? "border-primary bg-primary-light shadow-primary/30"
-                    : "border-gray-100 bg-white shadow-sm"
-                }`}
-              >
-                <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  {plan.tier}
-                </p>
-                <p className="mt-3 text-3xl font-bold text-gray-900">
-                  {plan.price}
-                </p>
-                <p className="mt-2 text-gray-600">{plan.description}</p>
-                <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                  {plan.benefits.map((benefit) => (
-                    <li key={benefit} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-primary" />
-                      {benefit}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/login"
-                  className={`mt-8 block rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
-                    plan.highlight
-                      ? "bg-primary text-white hover:bg-primary-hover"
-                      : "border border-gray-200 text-gray-900 hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  무료로 시작하기
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
       <section className="border-b border-gray-100 bg-gray-50">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
