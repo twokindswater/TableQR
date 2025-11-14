@@ -13,7 +13,7 @@ export function Header() {
 
   const handleSignOut = async () => {
     try {
-      await signOut({ callbackUrl: "/login" })
+      await signOut({ callbackUrl: "/" })
       toast({
         title: "로그아웃 완료",
         description: "안전하게 로그아웃되었습니다.",
@@ -73,4 +73,3 @@ export function Header() {
     </header>
   )
 }
-
