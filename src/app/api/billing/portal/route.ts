@@ -44,9 +44,15 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.redirect(result.customerPortalUrl)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to create Polar customer portal session:", error)
-    return NextResponse.json({ error: "구독 관리 페이지를 열 수 없습니다." }, { status: 500 })
+    // Surface insufficient scope to help configuration
+    const msg = typeof error?.body === 'string' ? error.body : undefined
+    const scopeHint =
+      'Polar access token needs customer_sessions:write (and possibly web:write) scope. Regenerate token and redeploy.'
+    return NextResponse.json(
+      { error: 'insufficient_scope', message: scopeHint, detail: msg },
+      { status: 403 },
+    )
   }
 }
-

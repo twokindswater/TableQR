@@ -12,7 +12,13 @@ export async function GET() {
   }
 
   const userRef = buildUserBillingRef(session.user.id)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[subscription] userRef:', userRef)
+  }
   const snapshot = await getSubscriptionSnapshot(userRef)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[subscription] snapshot:', snapshot)
+  }
   const isMultiStore = SUBSCRIBED_STATUSES.includes(snapshot.status)
 
   return NextResponse.json({
@@ -23,3 +29,5 @@ export async function GET() {
     storeLimit: isMultiStore ? null : 1,
   })
 }
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'

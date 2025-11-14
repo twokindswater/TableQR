@@ -155,6 +155,42 @@ export default function StoresPage() {
     loadStores();
   }, [toast]);
 
+  // After checkout redirect (?checkoutId=...), force a billing sync
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const checkoutId = url.searchParams.get('checkoutId')
+    const token = url.searchParams.get('customer_session_token')
+    if (!checkoutId && !token) return
+
+    let cancelled = false
+    const sync = async () => {
+      try {
+        await fetch('/api/billing/sync', { method: 'POST' })
+        if (!cancelled) {
+          // refresh subscription state immediately
+          const res = await fetch('/api/subscription', { cache: 'no-store' })
+          if (res.ok) {
+            const data = await res.json()
+            setSubscription({
+              status: data.status ?? 'none',
+              storeLimit: typeof data.storeLimit === 'number' || data.storeLimit === null ? data.storeLimit : 1,
+              trialEndsAt: data.trialEndsAt ?? null,
+              planName: data.planName ?? null,
+            })
+          }
+        }
+      } catch (e) {
+        console.error('billing sync failed', e)
+      }
+    }
+
+    sync()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     let active = true;
     const fetchSubscription = async () => {
@@ -264,12 +300,10 @@ export default function StoresPage() {
           tone: 'warning',
           title: trialDaysLeft !== null ? `무료 체험 D-${trialDaysLeft}` : '무료 체험 이용 중',
           body: trialEndText
-            ? `${trialEndText}까지 결제 없이 모든 기능을 사용할 수 있어요.`
-            : '체험 종료 전에 결제를 완료하면 서비스가 중단되지 않습니다.',
-          actionLabel: '체험 유지하기',
-          action: handleCheckoutRedirect,
-          secondaryLabel: '구독 관리',
-          secondaryAction: handleOpenPortal,
+            ? `${trialEndText}까지 모든 기능을 사용할 수 있어요. 결제/취소는 언제든 구독 관리에서 가능합니다.`
+            : '결제/취소는 언제든 구독 관리에서 가능합니다.',
+          actionLabel: '구독 관리',
+          action: handleOpenPortal,
         };
       case 'active':
         return {

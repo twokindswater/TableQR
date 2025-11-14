@@ -45,9 +45,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[checkout] userRef:', userRef)
+    console.log('[checkout] redirecting to Polar with url:', enrichedUrl.toString())
+  }
+
   const proxiedRequest = new NextRequest(enrichedUrl.toString(), {
     headers: Object.fromEntries(request.headers.entries()),
   })
 
   return checkout(proxiedRequest)
 }
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'

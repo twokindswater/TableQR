@@ -66,14 +66,20 @@ export async function getSubscriptionSnapshot(userRef: string | null): Promise<S
     .maybeSingle()
 
   if (error) {
-    console.error("Failed to load subscription snapshot:", error)
+    console.error("[billing] Failed to load subscription snapshot:", error)
     return DEFAULT_SNAPSHOT
   }
 
   if (!data) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[billing] no subscription snapshot for', userRef)
+    }
     return DEFAULT_SNAPSHOT
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[billing] raw snapshot:', data)
+  }
   return {
     status: normalizeStatus(data.status),
     trialEndsAt: data.trial_end,

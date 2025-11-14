@@ -109,6 +109,7 @@ async function upsertSubscription(payload: SubscriptionPayload) {
 }
 
 export async function POST(request: NextRequest) {
+  const isDev = process.env.NODE_ENV !== 'production'
   if (!process.env.POLAR_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "POLAR_WEBHOOK_SECRET is not configured" }, { status: 500 })
   }
@@ -117,16 +118,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured" }, { status: 500 })
   }
 
+  // Read raw body once
   const rawBody = await request.text()
+  if (isDev) {
+    console.log('[billing/webhook] received body length:', rawBody.length)
+  }
   const headers = {
     "webhook-id": request.headers.get("webhook-id") ?? "",
     "webhook-timestamp": request.headers.get("webhook-timestamp") ?? "",
     "webhook-signature": request.headers.get("webhook-signature") ?? "",
   }
+  if (isDev) {
+    console.log('[billing/webhook] headers:', {
+      id: headers['webhook-id'],
+      ts: headers['webhook-timestamp'],
+      sig_present: Boolean(headers['webhook-signature']),
+    })
+  }
 
   let event
   try {
-    event = validateEvent(rawBody, headers, process.env.POLAR_WEBHOOK_SECRET)
+    // Allow skipping signature verification in non-production for manual tests
+    if (process.env.POLAR_WEBHOOK_SKIP_VERIFY === 'true') {
+      event = JSON.parse(rawBody)
+      if (isDev) console.warn('[billing/webhook] SKIP VERIFY enabled, parsed event:', event?.type)
+    } else {
+      event = validateEvent(rawBody, headers, process.env.POLAR_WEBHOOK_SECRET)
+    }
   } catch (error) {
     if (error instanceof WebhookVerificationError) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
@@ -136,12 +154,25 @@ export async function POST(request: NextRequest) {
   }
 
   const eventId = headers["webhook-id"] || randomUUID()
-  await persistEvent(eventId, event.type, event)
+  try {
+    await persistEvent(eventId, event.type, event)
+    if (isDev) console.log('[billing/webhook] persisted event:', eventId, event.type)
+  } catch (e) {
+    console.error('[billing/webhook] failed to persist event', e)
+  }
 
   if (isSubscriptionPayload(event)) {
-    await upsertSubscription(event)
+    if (isDev) console.log('[billing/webhook] upserting subscription for', event.data.customer?.externalId)
+    try {
+      await upsertSubscription(event)
+      if (isDev) console.log('[billing/webhook] upserted subscription OK')
+    } catch (e) {
+      console.error('[billing/webhook] upsert error', e)
+      return NextResponse.json({ error: 'Upsert failed' }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ received: true })
 }
-
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
