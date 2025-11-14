@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
 import { useToast } from '@/hooks/use-toast'
-
-const PRODUCT_ID = process.env.NEXT_PUBLIC_POLAR_PRODUCT_ID ?? "9889da63-746a-407b-9e61-69753ca1dc8c"
-const CHECKOUT_PATH = PRODUCT_ID ? `/api/checkout?products=${PRODUCT_ID}` : null
+import { CHECKOUT_PATH } from '@/lib/checkout'
 
 const plan = {
   tier: 'TableQR Standard',
@@ -29,7 +27,7 @@ export function PricingSection() {
     if (!CHECKOUT_PATH) {
       toast({
         title: '결제 설정이 필요합니다',
-        description: '관리자에게 Polar 상품 ID를 확인해달라고 요청해주세요.',
+        description: '관리자에게 상품 ID를 확인해달라고 요청해주세요.',
         variant: 'destructive',
       })
       return
@@ -73,7 +71,7 @@ export function PricingSection() {
                 disabled={status === 'loading'}
                 className="mt-6 w-full rounded-2xl bg-gradient-to-r from-primary to-primary-hover px-8 py-4 text-lg font-extrabold uppercase tracking-wide text-white shadow-xl shadow-primary/40 transition hover:from-primary-hover hover:to-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
               >
-                {status === 'authenticated' ? '무료 체험 시작하기' : '로그인 후 시작하기'}
+                7일 무료 체험 시작
               </button>
             </div>
             <ul className="mt-8 space-y-3 text-base text-gray-900">

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 export default function LoginPage() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams?.get("callbackUrl") || "/stores"
+  const callbackUrl = searchParams?.get("callbackUrl") || "/"
 
   const handleGoogleSignIn = async () => {
     try {
