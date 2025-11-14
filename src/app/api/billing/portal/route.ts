@@ -1,0 +1,52 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { Polar } from "@polar-sh/sdk"
+
+import { authOptions } from "@/lib/auth"
+import { buildUserBillingRef, getPolarCustomerId } from "@/lib/billing"
+
+const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")
+const portalReturnUrl = `${baseUrl}/stores`
+const polarServer = process.env.POLAR_ENVIRONMENT === "production" ? "production" : "sandbox"
+const polarClient = process.env.POLAR_ACCESS_TOKEN
+  ? new Polar({
+      accessToken: process.env.POLAR_ACCESS_TOKEN,
+      server: polarServer,
+    })
+  : null
+
+export async function GET(request: NextRequest) {
+  if (!polarClient) {
+    return NextResponse.json({ error: "Polar client is not configured" }, { status: 500 })
+  }
+
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    const loginUrl = new URL("/login", request.url)
+    loginUrl.searchParams.set("callbackUrl", "/stores")
+    return NextResponse.redirect(loginUrl)
+  }
+
+  const userRef = buildUserBillingRef(session.user.id)
+  const customerId = await getPolarCustomerId(userRef)
+
+  if (!customerId) {
+    return NextResponse.json(
+      { error: "구독 정보가 확인되지 않습니다. 먼저 결제를 진행해주세요." },
+      { status: 404 },
+    )
+  }
+
+  try {
+    const result = await polarClient.customerSessions.create({
+      customerId,
+      returnUrl: portalReturnUrl,
+    })
+
+    return NextResponse.redirect(result.customerPortalUrl)
+  } catch (error) {
+    console.error("Failed to create Polar customer portal session:", error)
+    return NextResponse.json({ error: "구독 관리 페이지를 열 수 없습니다." }, { status: 500 })
+  }
+}
+

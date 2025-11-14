@@ -14,11 +14,15 @@
    - 보호 라우트 접근 시 세션 쿠키 없으면 `/login?callbackUrl=<원경로>`로 리다이렉트.
    - 세션 존재 시 계속 진행.
 4. **Landing Behavior**:
-   - 로그인 상태 사용자가 `/` 접근: 헤더 CTA를 “대시보드로 이동”으로 전환(자동 리다이렉트는 옵션).
+   - 로그인 상태 사용자가 `/` 접근: Trial/Active면 자동으로 `/stores`로 리다이렉트, 헤더 CTA 역시 “대시보드로 이동”.
+   - 미로그인: 헤더 주요 CTA는 “로그인”, 히어로 CTA는 `/#pricing`으로 안내하여 정보 탐색 → 결제 순서를 유지.
    - 미로그인 CTA는 항상 `/login?callbackUrl=/stores` 혹은 `/api/checkout?products=...`.
 5. **Checkout Flow**:
    - `PricingSection`과 대시보드 업셀 모달은 동일한 Checkout URL(`/api/checkout?products=<POLAR_PRODUCT_ID>`).
    - Checkout 성공 → `/stores`, 취소/실패 → 랜딩 `/#pricing`.
+6. **Billing Portal**:
+   - `/api/billing/portal`에서 Polar Customer Portal 세션을 생성해 사용자가 카드 변경/취소/재구독을 직접 처리하도록 한다.
+   - 대시보드 배너의 보조 CTA는 항상 Portal로 연결되어, 체험/유료 사용자 모두가 스스로 결제 상태를 관리할 수 있다.
 
 ## 3. Dashboard Flow Rules
 | 상태 | 허용 액션 | 제한/유도 |
@@ -41,4 +45,3 @@
 | `churn_warning` | Trial 종료 3일 전 배너 노출 수 | Dashboard banner |
 
 > 추가적으로 `QR_share_click`, `push_setup_complete`, `menu_update_count` 등을 파생 지표로 추적하면 Trial 가치 인지를 확인할 수 있습니다.
-

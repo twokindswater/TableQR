@@ -11,12 +11,98 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Spinner } from '@/components/ui/spinner';
 
-type SubscriptionStatus = 'loading' | 'none' | 'trialing' | 'active' | 'past_due'
+type SubscriptionStatus =
+  | 'loading'
+  | 'none'
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'unpaid'
 
 interface SubscriptionSnapshot {
   status: SubscriptionStatus
   storeLimit: number | null
   trialEndsAt: string | null
+  planName: string | null
+}
+
+type BannerTone = 'info' | 'success' | 'warning' | 'danger'
+
+const NEEDS_RENEWAL_STATUSES: SubscriptionStatus[] = [
+  'past_due',
+  'unpaid',
+  'incomplete',
+  'incomplete_expired',
+]
+
+const LIMITED_STATUSES: SubscriptionStatus[] = [
+  'none',
+  'canceled',
+  ...NEEDS_RENEWAL_STATUSES,
+]
+
+const BANNER_STYLES: Record<
+  BannerTone,
+  { wrapper: string; accent: string; button: string }
+> = {
+  success: {
+    wrapper: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    accent: 'text-emerald-600',
+    button: 'bg-white text-emerald-900 hover:bg-white/80',
+  },
+  warning: {
+    wrapper: 'border-amber-200 bg-amber-50 text-amber-900',
+    accent: 'text-amber-600',
+    button: 'bg-white text-amber-900 hover:bg-white/80',
+  },
+  danger: {
+    wrapper: 'border-rose-200 bg-rose-50 text-rose-900',
+    accent: 'text-rose-600',
+    button: 'bg-white text-rose-900 hover:bg-white/80',
+  },
+  info: {
+    wrapper: 'border-primary/20 bg-primary-light/30 text-primary-dark',
+    accent: 'text-primary',
+    button: 'bg-white text-primary hover:bg-white/80',
+  },
+}
+
+interface BannerConfig {
+  tone: BannerTone
+  title: string
+  body?: string
+  actionLabel?: string
+  action?: () => void
+  secondaryLabel?: string
+  secondaryAction?: () => void
+}
+
+function getCheckoutActionLabel(status: SubscriptionStatus) {
+  switch (status) {
+    case 'none':
+      return '7일 무료 체험 시작'
+    case 'trialing':
+      return '체험 유지하기'
+    case 'active':
+      return '구독 관리하기'
+    case 'canceled':
+      return '다시 구독하기'
+    case 'past_due':
+    case 'unpaid':
+    case 'incomplete':
+    case 'incomplete_expired':
+      return '결제 다시 진행하기'
+    default:
+      return '결제 진행하기'
+  }
+}
+
+function formatKoreanShortDate(date: Date | null) {
+  if (!date || Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
 }
 import {
   AlertDialog,
@@ -39,6 +125,7 @@ export default function StoresPage() {
     status: 'loading',
     storeLimit: 1,
     trialEndsAt: null,
+    planName: null,
   });
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
@@ -83,6 +170,7 @@ export default function StoresPage() {
           storeLimit:
             typeof data.storeLimit === 'number' || data.storeLimit === null ? data.storeLimit : 1,
           trialEndsAt: data.trialEndsAt ?? null,
+          planName: data.planName ?? null,
         });
       } catch (error) {
         console.error('구독 정보 조회 실패:', error);
@@ -91,6 +179,7 @@ export default function StoresPage() {
             status: 'none',
             storeLimit: 1,
             trialEndsAt: null,
+            planName: null,
           });
         }
       }
@@ -105,7 +194,152 @@ export default function StoresPage() {
   const subscriptionLoading = subscription.status === 'loading';
   const canCreateStore =
     subscription.status === 'active' || subscription.status === 'trialing' || stores.length === 0;
-  const showLimitBanner = subscription.status === 'none' && stores.length > 0;
+  const needsRenewal = NEEDS_RENEWAL_STATUSES.includes(subscription.status);
+  const isLimited = LIMITED_STATUSES.includes(subscription.status);
+  const trialEndDate = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
+  const trialDaysLeft =
+    trialEndDate && !Number.isNaN(trialEndDate.getTime())
+      ? Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : null;
+  const planLabel = subscription.planName ?? 'TableQR Standard';
+  const checkoutActionLabel = getCheckoutActionLabel(subscription.status);
+  const showLimitBanner = isLimited && stores.length > 0;
+  const trialEndText = formatKoreanShortDate(trialEndDate);
+  const limitBannerCopy = subscription.status === 'none'
+    ? {
+        title: '두 번째 매장은 7일 무료 체험 후 이용할 수 있어요.',
+        body: 'Trial을 시작하면 다점포 관리, 푸시 알림, 이미지 업로드가 즉시 열립니다.',
+        button: '7일 무료 체험 시작',
+      }
+    : {
+        title: '결제가 필요한 상태입니다',
+        body: '결제를 완료하면 모든 매장과 메뉴 편집 기능이 다시 활성화됩니다.',
+        button: checkoutActionLabel,
+      };
+  const handleCheckoutRedirect = () => {
+    if (!CHECKOUT_PATH) {
+      toast({
+        title: '결제 설정 필요',
+        description: '관리자에게 Polar 상품 ID를 설정해달라고 요청해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    router.push(CHECKOUT_PATH);
+  };
+
+  const handleOpenPortal = () => {
+    router.push('/api/billing/portal');
+  };
+  const upgradeDialogCopy =
+    subscription.status === 'none'
+      ? {
+          title: '다점포 관리는 Trial 시작 후 이용할 수 있어요',
+          description: '무료 체험을 시작하면 두 번째 매장부터 실시간으로 관리할 수 있습니다.',
+          action: '7일 무료 체험 시작',
+        }
+      : needsRenewal
+        ? {
+            title: '결제를 완료해야 추가 매장을 등록할 수 있어요',
+            description: '결제를 다시 진행하면 저장된 매장을 그대로 이어서 사용할 수 있습니다.',
+            action: '결제 다시 진행하기',
+          }
+        : subscription.status === 'canceled'
+          ? {
+              title: '구독이 해지된 상태입니다',
+              description: '다시 구독하면 다점포 관리와 푸시 알림 기능이 다시 활성화됩니다.',
+              action: '다시 구독하기',
+            }
+          : {
+              title: '업그레이드가 필요합니다',
+              description: '다점포 관리 기능을 이용하려면 구독이 필요합니다.',
+              action: checkoutActionLabel,
+            };
+
+  const billingBanner: BannerConfig | null = (() => {
+    if (subscriptionLoading) return null;
+    switch (subscription.status) {
+      case 'trialing':
+        return {
+          tone: 'warning',
+          title: trialDaysLeft !== null ? `무료 체험 D-${trialDaysLeft}` : '무료 체험 이용 중',
+          body: trialEndText
+            ? `${trialEndText}까지 결제 없이 모든 기능을 사용할 수 있어요.`
+            : '체험 종료 전에 결제를 완료하면 서비스가 중단되지 않습니다.',
+          actionLabel: '체험 유지하기',
+          action: handleCheckoutRedirect,
+          secondaryLabel: '구독 관리',
+          secondaryAction: handleOpenPortal,
+        };
+      case 'active':
+        return {
+          tone: 'success',
+          title: `${planLabel} 이용 중`,
+          body: '다점포, 실시간 대기 알림, 이미지 업로드까지 모두 활성화되었습니다.',
+          actionLabel: '구독 관리',
+          action: handleOpenPortal,
+        };
+      case 'none':
+        return {
+          tone: 'info',
+          title: '첫 매장은 무료로 시작할 수 있어요',
+          body: '7일 무료 체험을 시작하면 다점포 관리와 푸시 알림이 즉시 열립니다.',
+          actionLabel: '7일 무료 체험 시작',
+          action: handleCheckoutRedirect,
+        };
+      case 'canceled':
+        return {
+          tone: 'warning',
+          title: '구독이 해지된 상태입니다',
+          body: '다시 구독하면 저장된 매장을 그대로 이어서 사용할 수 있어요.',
+          actionLabel: '다시 구독하기',
+          action: handleCheckoutRedirect,
+          secondaryLabel: '구독 관리',
+          secondaryAction: handleOpenPortal,
+        };
+      default:
+        if (needsRenewal) {
+          return {
+            tone: 'danger',
+            title: '결제가 필요해요',
+            body: '결제를 완료해야 모든 매장을 계속 관리할 수 있습니다.',
+            actionLabel: '결제 다시 진행하기',
+            action: handleCheckoutRedirect,
+            secondaryLabel: '구독 관리',
+            secondaryAction: handleOpenPortal,
+          };
+        }
+        return null;
+    }
+  })();
+
+  const billingBannerNode = billingBanner ? (
+    <div className={`mb-8 rounded-2xl border p-5 text-sm ${BANNER_STYLES[billingBanner.tone].wrapper}`}>
+      <p className="text-base font-semibold">{billingBanner.title}</p>
+      {billingBanner.body && <p className="mt-1 text-sm">{billingBanner.body}</p>}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {billingBanner.actionLabel && billingBanner.action && (
+          <Button
+            size="sm"
+            className={`${BANNER_STYLES[billingBanner.tone].button}`}
+            onClick={billingBanner.action}
+          >
+            {billingBanner.actionLabel}
+          </Button>
+        )}
+        {billingBanner.secondaryLabel && billingBanner.secondaryAction && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-current text-current"
+            onClick={billingBanner.secondaryAction}
+          >
+            {billingBanner.secondaryLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  ) : null;
 
   const handleAddStoreClick = () => {
     if (subscriptionLoading) {
@@ -116,18 +350,6 @@ export default function StoresPage() {
       return;
     }
     setUpgradeDialogOpen(true);
-  };
-
-  const handleStartTrial = () => {
-    if (!CHECKOUT_PATH) {
-      toast({
-        title: '결제 설정 필요',
-        description: '관리자에게 Polar 상품 ID를 설정해달라고 요청해주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    router.push(CHECKOUT_PATH);
   };
 
   const handleDeleteClick = async (storeId: number) => {
@@ -173,6 +395,7 @@ export default function StoresPage() {
       <>
         <div className="container mx-auto px-4 py-8">
           <div className="mx-auto max-w-2xl">
+            {billingBannerNode}
             <div className="py-12 text-center">
               <StoreIcon className="mx-auto mb-4 h-16 w-16 text-gray-400" />
               <h2 className="mb-2 text-2xl font-bold">아직 등록된 가게가 없습니다</h2>
@@ -188,15 +411,14 @@ export default function StoresPage() {
         <AlertDialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>다점포 관리는 Trial 시작 후 이용할 수 있어요</AlertDialogTitle>
-              <AlertDialogDescription>
-                첫 번째 매장은 무료로 체험할 수 있습니다. 더 많은 매장을 등록하려면 7일 무료 체험을
-                시작해주세요.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{upgradeDialogCopy.title}</AlertDialogTitle>
+              <AlertDialogDescription>{upgradeDialogCopy.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>닫기</AlertDialogCancel>
-              <AlertDialogAction onClick={handleStartTrial}>7일 무료 체험 시작</AlertDialogAction>
+              <AlertDialogAction onClick={handleCheckoutRedirect}>
+                {upgradeDialogCopy.action}
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -208,6 +430,7 @@ export default function StoresPage() {
     <>
       <div className="container mx-auto px-4 py-8">
         <div className="mx-auto max-w-6xl">
+          {billingBannerNode}
           {/* 헤더 */}
           <div className="mb-8 flex items-center justify-between">
             <div>
@@ -222,17 +445,15 @@ export default function StoresPage() {
 
           {showLimitBanner && (
             <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-semibold">두 번째 매장은 7일 무료 체험 후 이용할 수 있어요.</p>
-              <p className="mt-1">
-                Trial을 시작하면 다점포 관리, 실시간 푸시 알림, QR 출력 기능이 즉시 열립니다.
-              </p>
+              <p className="font-semibold">{limitBannerCopy.title}</p>
+              <p className="mt-1">{limitBannerCopy.body}</p>
               <Button
                 variant="secondary"
                 size="sm"
                 className="mt-3 bg-white text-amber-900 hover:bg-white/80"
-                onClick={handleStartTrial}
+                onClick={handleCheckoutRedirect}
               >
-                7일 무료 체험 시작
+                {limitBannerCopy.button}
               </Button>
             </div>
           )}
@@ -254,15 +475,14 @@ export default function StoresPage() {
       <AlertDialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>다점포 관리는 Trial 시작 후 이용할 수 있어요</AlertDialogTitle>
-            <AlertDialogDescription>
-              무료 체험을 시작하면 매장 수 제한 없이 QR 메뉴, 대기 알림, 이미지 업로드를 사용할 수
-              있습니다.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{upgradeDialogCopy.title}</AlertDialogTitle>
+            <AlertDialogDescription>{upgradeDialogCopy.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>닫기</AlertDialogCancel>
-            <AlertDialogAction onClick={handleStartTrial}>7일 무료 체험 시작</AlertDialogAction>
+            <AlertDialogAction onClick={handleCheckoutRedirect}>
+              {upgradeDialogCopy.action}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

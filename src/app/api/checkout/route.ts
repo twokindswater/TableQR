@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { Checkout } from "@polar-sh/nextjs"
 
 import { authOptions } from "@/lib/auth"
+import { buildUserBillingRef } from "@/lib/billing"
 
 const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")
 const checkout = process.env.POLAR_ACCESS_TOKEN
@@ -30,6 +31,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  return checkout(request)
-}
+  const userRef = buildUserBillingRef(session.user?.id)
+  const enrichedUrl = new URL(request.url)
 
+  if (userRef) {
+    enrichedUrl.searchParams.set("customerExternalId", userRef)
+    enrichedUrl.searchParams.set("metadata", JSON.stringify({ userRef }))
+    if (session.user?.email) {
+      enrichedUrl.searchParams.set("customerEmail", session.user.email)
+    }
+    if (session.user?.name) {
+      enrichedUrl.searchParams.set("customerName", session.user.name)
+    }
+  }
+
+  const proxiedRequest = new NextRequest(enrichedUrl.toString(), {
+    headers: Object.fromEntries(request.headers.entries()),
+  })
+
+  return checkout(proxiedRequest)
+}

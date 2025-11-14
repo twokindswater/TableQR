@@ -40,6 +40,9 @@ export default function LoginPage() {
             <CardDescription className="text-lg mt-2">
               QR 코드로 시작하는<br />스마트 메뉴 관리
             </CardDescription>
+            <p className="mt-3 text-sm text-gray-500">
+              로그인 후 7일 무료 체험을 시작하고 다점포 기능을 바로 확인해보세요.
+            </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

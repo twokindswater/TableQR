@@ -1,10 +1,12 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Bell, Edit3, Globe, Laptop, QrCode } from "lucide-react"
 import { getServerSession } from "next-auth"
 
 import { PricingSection } from "@/components/landing/pricing-section"
+import { LandingLogoutButton } from "@/components/landing/landing-logout-button"
 import { authOptions } from "@/lib/auth"
-import { CHECKOUT_PATH } from "@/lib/checkout"
+import { SUBSCRIBED_STATUSES, buildUserBillingRef, getSubscriptionSnapshot } from "@/lib/billing"
 
 const features = [
   {
@@ -70,15 +72,91 @@ const faqs = [
   },
 ]
 
+const RENEWAL_STATUSES = new Set(["past_due", "unpaid", "incomplete", "incomplete_expired"])
+const HERO_STATUS_STYLES: Record<"success" | "warning" | "danger", string> = {
+  success: "border-emerald-100 bg-emerald-50 text-emerald-900",
+  warning: "border-amber-100 bg-amber-50 text-amber-900",
+  danger: "border-rose-100 bg-rose-50 text-rose-900",
+}
+type HeroStatusTone = keyof typeof HERO_STATUS_STYLES
+
+interface HeroStatusBlock {
+  tone: HeroStatusTone
+  title: string
+  body?: string
+}
+
 export default async function Home() {
   const session = await getServerSession(authOptions)
   const isAuthenticated = Boolean(session)
   const dashboardUrl = "/stores"
-  const checkoutTarget = CHECKOUT_PATH ?? dashboardUrl
-  const trialCtaHref = isAuthenticated
-    ? checkoutTarget
-    : `/login?callbackUrl=${encodeURIComponent(checkoutTarget)}`
   const headerLoginHref = `/login?callbackUrl=${encodeURIComponent(dashboardUrl)}`
+  const userRef = buildUserBillingRef(session?.user?.id)
+  const subscription = await getSubscriptionSnapshot(userRef)
+  const isSubscribed = SUBSCRIBED_STATUSES.includes(subscription.status)
+  const needsRenewal = RENEWAL_STATUSES.has(subscription.status)
+  const isCanceled = subscription.status === "canceled"
+  const trialEndDate = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null
+  const trialDaysLeft =
+    trialEndDate && !Number.isNaN(trialEndDate.getTime())
+      ? Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : null
+  const trialEndText = trialEndDate
+    ? trialEndDate.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })
+    : null
+  if (isAuthenticated && isSubscribed) {
+    redirect(dashboardUrl)
+  }
+
+  const heroPrimaryCta = { href: dashboardUrl, label: "대시보드로 이동" }
+  const marketingHeroCta = {
+    href: "#pricing",
+    label: needsRenewal ? "결제 안내 보기" : "7일 무료 체험 안내",
+  }
+  const heroCta = isAuthenticated && isSubscribed ? heroPrimaryCta : marketingHeroCta
+  const headerPrimaryCta =
+    isAuthenticated && isSubscribed
+      ? { href: dashboardUrl, label: "대시보드로 이동" }
+      : { href: headerLoginHref, label: "로그인" }
+  const secondaryCta = { href: "#features", label: "기능 살펴보기" }
+  const secondaryUsesAnchor = secondaryCta.href.startsWith("#")
+  const heroStatus: HeroStatusBlock | null = (() => {
+    if (subscription.status === "trialing") {
+      return {
+        tone: "warning",
+        title: trialDaysLeft !== null ? `무료 체험 D-${trialDaysLeft}` : "무료 체험 이용 중",
+        body: trialEndText ? `${trialEndText}까지 모든 기능을 제한 없이 사용할 수 있어요.` : undefined,
+      }
+    }
+    if (subscription.status === "active") {
+      return {
+        tone: "success",
+        title: "TableQR Standard 이용 중",
+        body: "다점포, 대기 알림, 이미지 업로드까지 이미 활성화되어 있습니다.",
+      }
+    }
+    if (needsRenewal) {
+      return {
+        tone: "danger",
+        title: "결제가 필요합니다",
+        body: "결제를 완료하면 서비스가 중단되지 않고 이어집니다.",
+      }
+    }
+    if (isCanceled) {
+      return {
+        tone: "warning",
+        title: "구독이 해지된 상태입니다",
+        body: "다시 구독하면 저장된 모든 데이터를 그대로 사용할 수 있어요.",
+      }
+    }
+    return null
+  })()
+  const heroStatusNode = heroStatus ? (
+    <div className={`rounded-2xl border px-4 py-3 text-left text-sm ${HERO_STATUS_STYLES[heroStatus.tone]}`}>
+      <p className="text-base font-semibold">{heroStatus.title}</p>
+      {heroStatus.body && <p className="mt-1">{heroStatus.body}</p>}
+    </div>
+  ) : null
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
       <header className="sticky top-0 z-20 border-b border-gray-100 bg-white/90 backdrop-blur">
@@ -94,17 +172,13 @@ export default async function Home() {
             <a href="#pricing" className="hover:text-primary">
               Pricing
             </a>
-            {!isAuthenticated && (
-              <Link href={headerLoginHref} className="hover:text-primary">
-                로그인
-              </Link>
-            )}
+            {isAuthenticated ? <LandingLogoutButton /> : null}
           </nav>
           <Link
-            href={isAuthenticated ? dashboardUrl : trialCtaHref}
+            href={headerPrimaryCta.href}
             className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md shadow-primary/30 transition hover:bg-primary-hover"
           >
-            {isAuthenticated ? "대시보드로 이동" : "7일 무료 체험 시작"}
+            {headerPrimaryCta.label}
           </Link>
         </div>
       </header>
@@ -115,34 +189,35 @@ export default async function Home() {
             <p className="inline-flex rounded-full bg-primary-light px-4 py-1 text-sm font-semibold text-primary">
               QR 메뉴 SaaS · TableQR Standard
             </p>
-            <h1 className="text-4xl font-bold leading-tight text-gray-900 md:text-5xl">
+            <h1 className="break-keep text-4xl font-bold leading-tight text-gray-900 md:max-w-2xl md:text-5xl">
               한 번의 QR로 다점포 운영을 끝내세요.
             </h1>
-            <p className="text-lg text-gray-600 md:text-xl">
+            <p className="break-keep text-lg text-gray-600 md:max-w-2xl md:text-xl">
               메뉴 수정, 대기 알림, 다국어 대응까지 모두 웹에서 즉시 반영됩니다.
               7일 동안 제한 없이 체험하고, 계속 쓰고 싶다면 월 $5면 충분해요.
             </p>
+            {heroStatusNode}
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center md:justify-start">
               <Link
-                href={trialCtaHref}
+                href={heroCta.href}
                 className="rounded-full bg-primary px-6 py-3 text-base font-semibold text-white shadow-lg shadow-primary/30 transition hover:bg-primary-hover"
               >
-                7일 무료 체험 시작
+                {heroCta.label}
               </Link>
-              {isAuthenticated ? (
-                <Link
-                  href={dashboardUrl}
-                  className="rounded-full border border-gray-200 px-6 py-3 text-base font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
-                >
-                  대시보드로 이동
-                </Link>
-              ) : (
+              {secondaryUsesAnchor ? (
                 <a
-                  href="#features"
+                  href={secondaryCta.href}
                   className="rounded-full border border-gray-200 px-6 py-3 text-base font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
                 >
-                  기능 살펴보기
+                  {secondaryCta.label}
                 </a>
+              ) : (
+                <Link
+                  href={secondaryCta.href}
+                  className="rounded-full border border-gray-200 px-6 py-3 text-base font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                >
+                  {secondaryCta.label}
+                </Link>
               )}
             </div>
           </div>
@@ -395,10 +470,10 @@ export default async function Home() {
             됩니다.
           </p>
           <Link
-            href={trialCtaHref}
+            href={heroCta.href}
             className="mt-8 inline-flex rounded-full bg-white px-6 py-3 text-base font-semibold text-primary shadow-lg transition hover:bg-gray-100"
           >
-            7일 무료 체험 시작
+            {heroCta.label}
           </Link>
         </div>
       </section>

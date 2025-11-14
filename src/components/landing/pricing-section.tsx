@@ -23,7 +23,7 @@ export function PricingSection() {
   const { toast } = useToast()
   const { status } = useSession()
 
-  const handlePlanClick = useCallback(() => {
+  const handlePlanClick = useCallback(async () => {
     if (!CHECKOUT_PATH) {
       toast({
         title: '결제 설정이 필요합니다',
@@ -40,6 +40,28 @@ export function PricingSection() {
     if (status !== 'authenticated') {
       router.push(`/login?callbackUrl=${encodeURIComponent(CHECKOUT_PATH)}`)
       return
+    }
+
+    try {
+      const response = await fetch('/api/subscription', { cache: 'no-store' })
+      if (response.status === 401) {
+        router.push(`/login?callbackUrl=${encodeURIComponent(CHECKOUT_PATH)}`)
+        return
+      }
+
+      if (response.ok) {
+        const snapshot = await response.json()
+        if (snapshot?.status === 'active' || snapshot?.status === 'trialing') {
+          toast({
+            title: '이미 활성 상태입니다',
+            description: '대시보드에서 매장을 계속 관리하세요.',
+          })
+          router.push('/stores')
+          return
+        }
+      }
+    } catch (error) {
+      console.error('구독 상태 확인 실패:', error)
     }
 
     window.location.href = CHECKOUT_PATH
