@@ -114,6 +114,44 @@ TableQR/
 
 ---
 
+## 💳 Billing & Subscription (Polar + Supabase)
+
+TableQR는 Polar Checkout을 사용해 단일 구독 상품(7일 무료 체험 → 월 $5)으로 운영됩니다. Google OAuth만 지원하므로 `google:<sub>` 형식의 외부 키로 모든 결제 데이터를 매핑합니다.
+
+1. **DB 마이그레이션**  
+   `supabase/migrations/005_billing_schema.sql`을 적용하면 아래 최소 스냅샷 테이블이 생성됩니다.
+   - `billing_customers(user_ref, polar_customer_id, region)`
+   - `subscriptions(user_ref, status, trial_end, current_period_end, product_id, plan_name, updated_at, source)`
+   - `billing_events(event_id, event_type, payload)`
+
+2. **환경 변수**  
+   ```
+   POLAR_ACCESS_TOKEN=...   # checkouts:write, subscriptions:read, customers:read 권한 권장
+   POLAR_ENVIRONMENT=sandbox|production
+   NEXT_PUBLIC_POLAR_PRODUCT_ID=...
+   POLAR_WEBHOOK_SECRET=...
+   NEXT_PUBLIC_APP_URL=https://tableqr.yourdomain.com
+   SUPABASE_SERVICE_ROLE_KEY=...   # webhook → DB upsert & 서버 측 조회에 필수
+   ```
+
+3. **Checkout 메타데이터**  
+   `/api/checkout`가 자동으로 `customerExternalId="google:<sub>"`와 `metadata.userRef`를 Polar에 전달합니다. 이메일/이름은 Polar에만 남고 Supabase에는 저장하지 않습니다.
+
+4. **Webhook 구성**  
+   Polar 대시보드에서 `POST https://{app-domain}/api/billing/webhook`으로 구독 이벤트를 전송하고, 동일한 `POLAR_WEBHOOK_SECRET`을 사용하세요. 웹훅은 멱등 처리되며 `billing_events`에 기록된 뒤 `subscriptions` 스냅샷을 갱신합니다.
+
+5. **구독 관리 (Customer Portal)**  
+   - `/api/billing/portal`이 Polar Customer Portal 세션을 생성해 고객이 카드 변경·취소·재구독을 직접 처리합니다.  
+   - 대시보드 배너와 CTA는 해당 엔드포인트로 리다이렉트하여 취소/결제 관리 UX를 제공합니다.
+
+6. **앱 가드 흐름**  
+   - `/api/subscription`이 Supabase에서 스냅샷을 읽어 랜딩 CTA/대시보드 제약을 결정합니다.
+   - Trial/Active 상태만 다점포·고급 기능이 열리고, 그 외 상태는 1개 매장 제한 + 업셀 모달이 노출됩니다.
+
+모든 구독 데이터는 user_ref·상태·기간처럼 최소한의 정보만 저장하므로 GDPR/데이터 이전 요구사항을 충족하며, 이메일 등 PII는 Polar에 남겨둔 채 필요 시 API로 조회합니다.
+
+---
+
 ## 📈 개발 진행 상황
 
 | Phase | 상태 | 설명 |

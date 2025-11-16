@@ -1,5 +1,12 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Bell, Edit3, Globe, Laptop, QrCode } from "lucide-react"
+import { getServerSession } from "next-auth"
+
+import { PricingSection } from "@/components/landing/pricing-section"
+import { LandingLogoutButton } from "@/components/landing/landing-logout-button"
+import { authOptions } from "@/lib/auth"
+import { SUBSCRIBED_STATUSES, buildUserBillingRef, getSubscriptionSnapshot } from "@/lib/billing"
 
 const features = [
   {
@@ -29,41 +36,21 @@ const features = [
   },
 ]
 
-const globalValues = [
-  "앱을 깔 필요가 없습니다.",
-  "매장마다 QR 하나면 충분합니다.",
-  "언제든 수정, 바로 반영.",
-  "언어 장벽 없이, 어디서나 통합니다.",
-  "스마트폰으로 바로 접근하는 웹 메뉴판.",
-]
-
-const pricingPlans = [
+const impactHighlights = [
   {
-    tier: "Free",
-    price: "₩0 /월",
-    description: "소규모 매장을 위한 시작 플랜",
-    benefits: ["QR 메뉴 1개", "기본 통계", "브라우저 번역"],
+    value: "7일 무료",
+    label: "TableQR Standard 체험",
+    description: "다점포·푸시 알림까지 전부 열려요.",
   },
   {
-    tier: "Standard",
-    price: "₩29,000 /월",
-    description: "대부분의 매장에 적합한 핵심 기능",
-    benefits: [
-      "QR 메뉴 3개",
-      "대기/푸시 알림",
-      "실시간 메뉴 편집",
-    ],
-    highlight: true,
+    value: "1개의 QR",
+    label: "모든 매장을 커버",
+    description: "고객은 QR만 스캔하면 끝.",
   },
   {
-    tier: "Pro",
-    price: "₩59,000 /월",
-    description: "체인점과 글로벌 매장을 위한 확장 기능",
-    benefits: [
-      "무제한 QR 메뉴",
-      "고급 분석 & 레포트",
-      "우선 지원",
-    ],
+    value: "5분 → 즉시",
+    label: "메뉴 업데이트 시간",
+    description: "변동 사항을 클릭 한 번으로 반영.",
   },
 ]
 
@@ -85,30 +72,113 @@ const faqs = [
   },
 ]
 
-export default function Home() {
+const RENEWAL_STATUSES = new Set(["past_due", "unpaid", "incomplete", "incomplete_expired"])
+const HERO_STATUS_STYLES: Record<"success" | "warning" | "danger", string> = {
+  success: "border-emerald-100 bg-emerald-50 text-emerald-900",
+  warning: "border-amber-100 bg-amber-50 text-amber-900",
+  danger: "border-rose-100 bg-rose-50 text-rose-900",
+}
+type HeroStatusTone = keyof typeof HERO_STATUS_STYLES
+
+interface HeroStatusBlock {
+  tone: HeroStatusTone
+  title: string
+  body?: string
+}
+
+export default async function Home() {
+  const session = await getServerSession(authOptions)
+  const isAuthenticated = Boolean(session)
+  const dashboardUrl = "/stores"
+  const headerLoginHref = `/login?callbackUrl=${encodeURIComponent(dashboardUrl)}`
+  const userRef = buildUserBillingRef(session?.user?.id)
+  const subscription = await getSubscriptionSnapshot(userRef)
+  const isSubscribed = SUBSCRIBED_STATUSES.includes(subscription.status)
+  const needsRenewal = RENEWAL_STATUSES.has(subscription.status)
+  const isCanceled = subscription.status === "canceled"
+  const trialEndDate = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null
+  const trialDaysLeft =
+    trialEndDate && !Number.isNaN(trialEndDate.getTime())
+      ? Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : null
+  const trialEndText = trialEndDate
+    ? trialEndDate.toLocaleDateString("ko-KR", { month: "long", day: "numeric" })
+    : null
+  if (isAuthenticated && isSubscribed) {
+    redirect(dashboardUrl)
+  }
+
+  const heroPrimaryCta = { href: dashboardUrl, label: "대시보드로 이동" }
+  const marketingHeroCta = {
+    href: "#pricing",
+    label: needsRenewal ? "결제 안내 보기" : "7일 무료 체험 안내",
+  }
+  const heroCta = isAuthenticated && isSubscribed ? heroPrimaryCta : marketingHeroCta
+  const headerPrimaryCta =
+    isAuthenticated && isSubscribed
+      ? { href: dashboardUrl, label: "대시보드로 이동" }
+      : { href: headerLoginHref, label: "로그인" }
+  const secondaryCta = { href: "#features", label: "기능 살펴보기" }
+  const secondaryUsesAnchor = secondaryCta.href.startsWith("#")
+  const heroStatus: HeroStatusBlock | null = (() => {
+    if (subscription.status === "trialing") {
+      return {
+        tone: "warning",
+        title: trialDaysLeft !== null ? `무료 체험 D-${trialDaysLeft}` : "무료 체험 이용 중",
+        body: trialEndText ? `${trialEndText}까지 모든 기능을 제한 없이 사용할 수 있어요.` : undefined,
+      }
+    }
+    if (subscription.status === "active") {
+      return {
+        tone: "success",
+        title: "TableQR Standard 이용 중",
+        body: "다점포, 대기 알림, 이미지 업로드까지 이미 활성화되어 있습니다.",
+      }
+    }
+    if (needsRenewal) {
+      return {
+        tone: "danger",
+        title: "결제가 필요합니다",
+        body: "결제를 완료하면 서비스가 중단되지 않고 이어집니다.",
+      }
+    }
+    if (isCanceled) {
+      return {
+        tone: "warning",
+        title: "구독이 해지된 상태입니다",
+        body: "다시 구독하면 저장된 모든 데이터를 그대로 사용할 수 있어요.",
+      }
+    }
+    return null
+  })()
+  const heroStatusNode = heroStatus ? (
+    <div className={`rounded-2xl border px-4 py-3 text-left text-sm ${HERO_STATUS_STYLES[heroStatus.tone]}`}>
+      <p className="text-base font-semibold">{heroStatus.title}</p>
+      {heroStatus.body && <p className="mt-1">{heroStatus.body}</p>}
+    </div>
+  ) : null
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-gray-100">
+      <header className="sticky top-0 z-20 border-b border-gray-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="text-2xl font-semibold text-primary">
-            TableQR
-          </div>
-          <nav className="hidden items-center gap-8 text-sm font-medium text-gray-600 md:flex">
-            <Link href="/login" className="hover:text-primary">
-              로그인
-            </Link>
-            <Link href="/login" className="hover:text-primary">
-              회원가입
-            </Link>
+          <div className="text-2xl font-semibold text-primary">TableQR</div>
+          <nav className="hidden items-center gap-6 text-sm font-medium text-gray-600 md:flex">
+            <a href="#features" className="hover:text-primary">
+              기능
+            </a>
+            <a href="#demo" className="hover:text-primary">
+              데모
+            </a>
             <a href="#pricing" className="hover:text-primary">
               Pricing
             </a>
+            {isAuthenticated ? <LandingLogoutButton /> : null}
           </nav>
           <Link
-            href="/login"
+            href={headerPrimaryCta.href}
             className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-md shadow-primary/30 transition hover:bg-primary-hover"
           >
-            무료로 메뉴판 만들기
+            {headerPrimaryCta.label}
           </Link>
         </div>
       </header>
@@ -117,29 +187,38 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 py-16 md:flex-row md:py-24">
           <div className="flex-1 space-y-6 text-center md:text-left">
             <p className="inline-flex rounded-full bg-primary-light px-4 py-1 text-sm font-semibold text-primary">
-              QR 메뉴 SaaS · TableQR
+              QR 메뉴 SaaS · TableQR Standard
             </p>
-            <h1 className="text-4xl font-bold leading-tight text-gray-900 md:text-5xl">
-              언제 어디서나, QR 하나로 메뉴를 보여주세요.
+            <h1 className="break-keep text-4xl font-bold leading-tight text-gray-900 md:max-w-2xl md:text-5xl">
+              한 번의 QR로 다점포 운영을 끝내세요.
             </h1>
-            <p className="text-lg text-gray-600 md:text-xl">
-              매장마다 다른 메뉴판을 웹으로 바로 업데이트하세요. 설치
-              없이, 로그인 없이, QR 스캔만으로 전 세계 손님에게 메뉴를
-              전달할 수 있습니다.
+            <p className="break-keep text-lg text-gray-600 md:max-w-2xl md:text-xl">
+              메뉴 수정, 대기 알림, 다국어 대응까지 모두 웹에서 즉시 반영됩니다.
+              7일 동안 제한 없이 체험하고, 계속 쓰고 싶다면 월 $5면 충분해요.
             </p>
+            {heroStatusNode}
             <div className="flex flex-col gap-4 sm:flex-row sm:justify-center md:justify-start">
               <Link
-                href="/login"
+                href={heroCta.href}
                 className="rounded-full bg-primary px-6 py-3 text-base font-semibold text-white shadow-lg shadow-primary/30 transition hover:bg-primary-hover"
               >
-                무료로 메뉴판 만들기
+                {heroCta.label}
               </Link>
-              <a
-                href="#features"
-                className="rounded-full border border-gray-200 px-6 py-3 text-base font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
-              >
-                기능 살펴보기
-              </a>
+              {secondaryUsesAnchor ? (
+                <a
+                  href={secondaryCta.href}
+                  className="rounded-full border border-gray-200 px-6 py-3 text-base font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                >
+                  {secondaryCta.label}
+                </a>
+              ) : (
+                <Link
+                  href={secondaryCta.href}
+                  className="rounded-full border border-gray-200 px-6 py-3 text-base font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                >
+                  {secondaryCta.label}
+                </Link>
+              )}
             </div>
           </div>
           <div className="flex-1">
@@ -244,26 +323,28 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
           <div className="mb-10 text-center">
             <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-              Global Values
+              Why TableQR
             </p>
             <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
-              전 세계 고객이 이해할 수 있는 경험
+              7일 체험으로 확인할 수 있는 변화
             </h2>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {globalValues.map((value) => (
+          <div className="grid gap-6 md:grid-cols-3">
+            {impactHighlights.map((item) => (
               <div
-                key={value}
-                className="rounded-3xl border border-gray-100 bg-gray-50 p-5 text-gray-800 shadow-sm"
+                key={item.label}
+                className="rounded-3xl border border-gray-100 bg-gray-50 p-6 text-gray-800 shadow-sm"
               >
-                <p className="text-lg font-semibold">{value}</p>
+                <p className="text-3xl font-extrabold text-primary">{item.value}</p>
+                <p className="mt-2 text-lg font-semibold">{item.label}</p>
+                <p className="mt-1 text-sm text-gray-600">{item.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-b border-gray-100 bg-gray-50">
+      <section id="demo" className="border-b border-gray-100 bg-gray-50">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
           <div className="mb-12 text-center">
             <p className="text-sm font-semibold uppercase tracking-wide text-primary">
@@ -347,59 +428,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section
-        id="pricing"
-        className="border-b border-gray-100 bg-white"
-      >
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="mb-12 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-              Pricing
-            </p>
-            <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
-              매장 규모에 맞는 요금제를 선택하세요
-            </h2>
-          </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {pricingPlans.map((plan) => (
-              <div
-                key={plan.tier}
-                className={`rounded-3xl border p-8 transition hover:-translate-y-1 hover:shadow-lg ${
-                  plan.highlight
-                    ? "border-primary bg-primary-light shadow-primary/30"
-                    : "border-gray-100 bg-white shadow-sm"
-                }`}
-              >
-                <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  {plan.tier}
-                </p>
-                <p className="mt-3 text-3xl font-bold text-gray-900">
-                  {plan.price}
-                </p>
-                <p className="mt-2 text-gray-600">{plan.description}</p>
-                <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                  {plan.benefits.map((benefit) => (
-                    <li key={benefit} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-primary" />
-                      {benefit}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/login"
-                  className={`mt-8 block rounded-full px-4 py-3 text-center text-sm font-semibold transition ${
-                    plan.highlight
-                      ? "bg-primary text-white hover:bg-primary-hover"
-                      : "border border-gray-200 text-gray-900 hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  무료로 시작하기
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
       <section className="border-b border-gray-100 bg-gray-50">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
@@ -441,10 +470,10 @@ export default function Home() {
             됩니다.
           </p>
           <Link
-            href="/login"
+            href={heroCta.href}
             className="mt-8 inline-flex rounded-full bg-white px-6 py-3 text-base font-semibold text-primary shadow-lg transition hover:bg-gray-100"
           >
-            무료로 메뉴판 만들기
+            {heroCta.label}
           </Link>
         </div>
       </section>

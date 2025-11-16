@@ -1,17 +1,20 @@
 'use client'
 
 import { signIn } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams?.get("callbackUrl") || "/"
 
   const handleGoogleSignIn = async () => {
     try {
       await signIn("google", {
-        callbackUrl: "/stores",
+        callbackUrl,
       })
     } catch (error) {
       console.error("Login error:", error)
@@ -37,6 +40,9 @@ export default function LoginPage() {
             <CardDescription className="text-lg mt-2">
               QR 코드로 시작하는<br />스마트 메뉴 관리
             </CardDescription>
+            <p className="mt-3 text-sm text-gray-500">
+              로그인 후 7일 무료 체험을 시작하고 다점포 기능을 바로 확인해보세요.
+            </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -74,4 +80,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
