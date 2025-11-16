@@ -8,7 +8,6 @@ import { Store } from '@/types/database';
 import { StoreCard } from '@/components/stores/store-card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { Spinner } from '@/components/ui/spinner';
 
 type SubscriptionStatus =
@@ -119,11 +118,13 @@ import {
 import { CHECKOUT_PATH } from '@/lib/checkout';
 import { useSession } from '@/hooks/use-session';
 
+type StoreWithMenuCount = Store & { menuCount: number }
+
 export default function StoresPage() {
   const { toast } = useToast();
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const [stores, setStores] = useState<Store[]>([]);
+  const [stores, setStores] = useState<StoreWithMenuCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionSnapshot>({
     status: 'loading',
@@ -137,9 +138,6 @@ export default function StoresPage() {
 
   useEffect(() => {
     const loadStores = async () => {
-      if (sessionStatus !== 'authenticated' || !session?.user?.id) {
-        return;
-      }
       try {
         setLoading(true);
         const response = await fetch('/api/stores', { cache: 'no-store' })
@@ -147,7 +145,13 @@ export default function StoresPage() {
           throw new Error('failed to load stores')
         }
         const payload = await response.json()
-        setStores(Array.isArray(payload?.stores) ? payload.stores : []);
+        const storeData: StoreWithMenuCount[] = Array.isArray(payload?.stores)
+          ? payload.stores.map((store: StoreWithMenuCount) => ({
+              ...store,
+              menuCount: typeof store.menuCount === 'number' ? store.menuCount : 0,
+            }))
+          : []
+        setStores(storeData);
       } catch (error) {
         console.error('스토어 조회 실패:', error);
         toast({
@@ -160,261 +164,17 @@ export default function StoresPage() {
       }
     };
 
+    if (sessionStatus === 'loading') {
+      return
+    }
+    if (sessionStatus !== 'authenticated' || !session?.user?.id) {
+      setStores([])
+      setLoading(false)
+      return
+    }
+
     loadStores();
   }, [session?.user?.id, sessionStatus, toast]);
-
-  // After checkout redirect (?checkoutId=...), force a billing sync
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    const checkoutId = url.searchParams.get('checkoutId')
-    const token = url.searchParams.get('customer_session_token')
-    if (!checkoutId && !token) return
-
-    let cancelled = false
-    const sync = async () => {
-      try {
-        await fetch('/api/billing/sync', { method: 'POST' })
-        if (!cancelled) {
-          // refresh subscription state immediately
-          const res = await fetch('/api/subscription', { cache: 'no-store' })
-          if (res.ok) {
-            const data = await res.json()
-            setSubscription({
-              status: data.status ?? 'none',
-              storeLimit: typeof data.storeLimit === 'number' || data.storeLimit === null ? data.storeLimit : 1,
-              trialEndsAt: data.trialEndsAt ?? null,
-              planName: data.planName ?? null,
-              currentPeriodEnd: data.currentPeriodEnd ?? null,
-              cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
-            })
-          }
-        }
-      } catch (e) {
-        console.error('billing sync failed', e)
-      }
-    }
-
-    sync()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let active = true;
-    const fetchSubscription = async () => {
-      try {
-        const response = await fetch('/api/subscription');
-        if (!response.ok) {
-          throw new Error('failed to load subscription');
-        }
-        const data = await response.json();
-        if (!active) return;
-        setSubscription({
-          status: data.status ?? 'none',
-          storeLimit:
-            typeof data.storeLimit === 'number' || data.storeLimit === null ? data.storeLimit : 1,
-          trialEndsAt: data.trialEndsAt ?? null,
-          planName: data.planName ?? null,
-          currentPeriodEnd: data.currentPeriodEnd ?? null,
-          cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
-        });
-      } catch (error) {
-        console.error('구독 정보 조회 실패:', error);
-        if (active) {
-          setSubscription({
-            status: 'none',
-            storeLimit: 1,
-            trialEndsAt: null,
-            planName: null,
-            currentPeriodEnd: null,
-            cancelAtPeriodEnd: false,
-          });
-        }
-      }
-    };
-
-    fetchSubscription();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const subscriptionLoading = subscription.status === 'loading';
-  const canCreateStore =
-    subscription.status === 'active' || subscription.status === 'trialing' || stores.length === 0;
-  const needsRenewal = NEEDS_RENEWAL_STATUSES.includes(subscription.status);
-  const isLimited = LIMITED_STATUSES.includes(subscription.status);
-  const trialEndDate = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
-  const trialDaysLeft =
-    trialEndDate && !Number.isNaN(trialEndDate.getTime())
-      ? Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-      : null;
-  const currentPeriodEndDate = subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
-  const planLabel = subscription.planName ?? 'TableQR Standard';
-  const checkoutActionLabel = getCheckoutActionLabel(subscription.status);
-  const showLimitBanner = isLimited && stores.length > 0;
-  const trialEndText = formatKoreanShortDate(trialEndDate);
-  const currentPeriodEndText = formatKoreanShortDate(currentPeriodEndDate);
-  const cancellationNotice =
-    subscription.cancelAtPeriodEnd && currentPeriodEndText
-      ? `${currentPeriodEndText}에 자동 해지됩니다.`
-      : null;
-  const limitBannerCopy = subscription.status === 'none'
-    ? {
-        title: '두 번째 매장은 7일 무료 체험 후 이용할 수 있어요.',
-        body: 'Trial을 시작하면 다점포 관리, 푸시 알림, 이미지 업로드가 즉시 열립니다.',
-        button: '7일 무료 체험 시작',
-      }
-    : {
-        title: '결제가 필요한 상태입니다',
-        body: '결제를 완료하면 모든 매장과 메뉴 편집 기능이 다시 활성화됩니다.',
-        button: checkoutActionLabel,
-      };
-  const handleCheckoutRedirect = () => {
-    if (!CHECKOUT_PATH) {
-      toast({
-        title: '결제 설정 필요',
-        description: '관리자에게 Polar 상품 ID를 설정해달라고 요청해주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    router.push(CHECKOUT_PATH);
-  };
-
-  const handleOpenPortal = () => {
-    router.push('/api/billing/portal');
-  };
-  const upgradeDialogCopy =
-    subscription.status === 'none'
-      ? {
-          title: '다점포 관리는 Trial 시작 후 이용할 수 있어요',
-          description: '무료 체험을 시작하면 두 번째 매장부터 실시간으로 관리할 수 있습니다.',
-          action: '7일 무료 체험 시작',
-        }
-      : needsRenewal
-        ? {
-            title: '결제를 완료해야 추가 매장을 등록할 수 있어요',
-            description: '결제를 다시 진행하면 저장된 매장을 그대로 이어서 사용할 수 있습니다.',
-            action: '결제 다시 진행하기',
-          }
-        : subscription.status === 'canceled'
-          ? {
-              title: '구독이 해지된 상태입니다',
-              description: '다시 구독하면 다점포 관리와 푸시 알림 기능이 다시 활성화됩니다.',
-              action: '다시 구독하기',
-            }
-          : {
-              title: '업그레이드가 필요합니다',
-              description: '다점포 관리 기능을 이용하려면 구독이 필요합니다.',
-              action: checkoutActionLabel,
-            };
-
-  const rawBillingBanner: BannerConfig | null = (() => {
-    if (subscriptionLoading) return null;
-    switch (subscription.status) {
-      case 'trialing':
-        return {
-          tone: 'warning',
-          title: trialDaysLeft !== null ? `무료 체험 D-${trialDaysLeft}` : '무료 체험 이용 중',
-          body: trialEndText
-            ? `${trialEndText}까지 모든 기능을 사용할 수 있어요. 결제/취소는 언제든 구독 관리에서 가능합니다.`
-            : '결제/취소는 언제든 구독 관리에서 가능합니다.',
-          actionLabel: '구독 관리',
-          action: handleOpenPortal,
-        };
-      case 'active':
-        return {
-          tone: 'success',
-          title: `${planLabel} 이용 중`,
-          body: '다점포, 실시간 대기 알림, 이미지 업로드까지 모두 활성화되었습니다.',
-          actionLabel: '구독 관리',
-          action: handleOpenPortal,
-        };
-      case 'none':
-        return {
-          tone: 'info',
-          title: '첫 매장은 무료로 시작할 수 있어요',
-          body: '7일 무료 체험을 시작하면 다점포 관리와 푸시 알림이 즉시 열립니다.',
-          actionLabel: '7일 무료 체험 시작',
-          action: handleCheckoutRedirect,
-        };
-      case 'canceled':
-        return {
-          tone: 'warning',
-          title: '구독이 해지된 상태입니다',
-          body: '다시 구독하면 저장된 매장을 그대로 이어서 사용할 수 있어요.',
-          actionLabel: '다시 구독하기',
-          action: handleCheckoutRedirect,
-          secondaryLabel: '구독 관리',
-          secondaryAction: handleOpenPortal,
-        };
-      default:
-        if (needsRenewal) {
-          return {
-            tone: 'danger',
-            title: '결제가 필요해요',
-            body: '결제를 완료해야 모든 매장을 계속 관리할 수 있습니다.',
-            actionLabel: '결제 다시 진행하기',
-            action: handleCheckoutRedirect,
-            secondaryLabel: '구독 관리',
-            secondaryAction: handleOpenPortal,
-          };
-        }
-        return null;
-    }
-  })();
-
-  const billingBanner =
-    cancellationNotice && rawBillingBanner
-      ? {
-          ...rawBillingBanner,
-          body: rawBillingBanner.body
-            ? `${rawBillingBanner.body} ${cancellationNotice}`
-            : cancellationNotice,
-        }
-      : rawBillingBanner;
-
-  const billingBannerNode = billingBanner ? (
-    <div className={`mb-8 rounded-2xl border p-5 text-sm ${BANNER_STYLES[billingBanner.tone].wrapper}`}>
-      <p className="text-base font-semibold">{billingBanner.title}</p>
-      {billingBanner.body && <p className="mt-1 text-sm">{billingBanner.body}</p>}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {billingBanner.actionLabel && billingBanner.action && (
-          <Button
-            size="sm"
-            className={`${BANNER_STYLES[billingBanner.tone].button}`}
-            onClick={billingBanner.action}
-          >
-            {billingBanner.actionLabel}
-          </Button>
-        )}
-        {billingBanner.secondaryLabel && billingBanner.secondaryAction && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-current text-current"
-            onClick={billingBanner.secondaryAction}
-          >
-            {billingBanner.secondaryLabel}
-          </Button>
-        )}
-      </div>
-    </div>
-  ) : null;
-
-  const handleAddStoreClick = () => {
-    if (subscriptionLoading) {
-      return;
-    }
-    if (canCreateStore) {
-      router.push('/stores/new');
-      return;
-    }
-    setUpgradeDialogOpen(true);
-  };
 
   // After checkout redirect (?checkoutId=...), force a billing sync
   useEffect(() => {
@@ -787,7 +547,7 @@ export default function StoresPage() {
               <StoreCard
                 key={store.store_id}
                 store={store}
-                menuCount={0}
+                menuCount={store.menuCount}
                 onDelete={handleDeleteClick}
               />
             ))}

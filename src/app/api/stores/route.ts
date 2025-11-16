@@ -4,6 +4,22 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/supabase-admin"
 
+type StoreRow = {
+  store_id: number
+  user_id: string | null
+  name: string | null
+  description: string | null
+  phone: string | null
+  logo_url: string | null
+  cover_url: string | null
+  business_hours: string | null
+  notice: string | null
+  address: string | null
+  created_at: string
+  updated_at: string | null
+  menus?: { count: number }[]
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -15,7 +31,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("stores")
-    .select("*")
+    .select("*, menus(count)")
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
 
@@ -24,7 +40,17 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load stores" }, { status: 500 })
   }
 
-  return NextResponse.json({ stores: data ?? [] })
+  const stores =
+    (data as StoreRow[] | null)?.map((store) => {
+      const [{ count } = { count: 0 }] = Array.isArray(store.menus) ? store.menus : []
+      const { menus, ...rest } = store
+      return {
+        ...rest,
+        menuCount: typeof count === "number" ? count : 0,
+      }
+    }) ?? []
+
+  return NextResponse.json({ stores })
 }
 
 export async function POST(request: NextRequest) {
