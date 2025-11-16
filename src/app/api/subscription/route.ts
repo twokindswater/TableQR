@@ -26,6 +26,7 @@ export async function GET() {
     trialEndsAt: snapshot.trialEndsAt,
     currentPeriodEnd: snapshot.currentPeriodEnd,
     planName: snapshot.planName,
+    cancelAtPeriodEnd: snapshot.cancelAtPeriodEnd,
     storeLimit: isMultiStore ? null : 1,
   })
 }

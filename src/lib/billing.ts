@@ -16,6 +16,7 @@ export interface SubscriptionSnapshot {
   currentPeriodEnd: string | null
   productId: string | null
   planName: string | null
+  cancelAtPeriodEnd: boolean
 }
 
 const DEFAULT_SNAPSHOT: SubscriptionSnapshot = {
@@ -24,6 +25,7 @@ const DEFAULT_SNAPSHOT: SubscriptionSnapshot = {
   currentPeriodEnd: null,
   productId: null,
   planName: null,
+  cancelAtPeriodEnd: false,
 }
 
 const KNOWN_STATUSES: SubscriptionStatus[] = [
@@ -61,7 +63,7 @@ export async function getSubscriptionSnapshot(userRef: string | null): Promise<S
 
   const { data, error } = await supabaseAdmin
     .from("subscriptions")
-    .select("status, trial_end, current_period_end, product_id, plan_name")
+    .select("status, trial_end, current_period_end, product_id, plan_name, cancel_at_period_end")
     .eq("user_ref", userRef)
     .maybeSingle()
 
@@ -86,6 +88,7 @@ export async function getSubscriptionSnapshot(userRef: string | null): Promise<S
     currentPeriodEnd: data.current_period_end,
     productId: data.product_id,
     planName: data.plan_name,
+    cancelAtPeriodEnd: Boolean(data.cancel_at_period_end),
   }
 }
 

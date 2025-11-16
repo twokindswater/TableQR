@@ -27,6 +27,8 @@ interface SubscriptionSnapshot {
   storeLimit: number | null
   trialEndsAt: string | null
   planName: string | null
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
 }
 
 type BannerTone = 'info' | 'success' | 'warning' | 'danger'
@@ -126,6 +128,8 @@ export default function StoresPage() {
     storeLimit: 1,
     trialEndsAt: null,
     planName: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
   });
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
@@ -176,6 +180,8 @@ export default function StoresPage() {
               storeLimit: typeof data.storeLimit === 'number' || data.storeLimit === null ? data.storeLimit : 1,
               trialEndsAt: data.trialEndsAt ?? null,
               planName: data.planName ?? null,
+              currentPeriodEnd: data.currentPeriodEnd ?? null,
+              cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
             })
           }
         }
@@ -207,6 +213,8 @@ export default function StoresPage() {
             typeof data.storeLimit === 'number' || data.storeLimit === null ? data.storeLimit : 1,
           trialEndsAt: data.trialEndsAt ?? null,
           planName: data.planName ?? null,
+          currentPeriodEnd: data.currentPeriodEnd ?? null,
+          cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
         });
       } catch (error) {
         console.error('구독 정보 조회 실패:', error);
@@ -216,6 +224,8 @@ export default function StoresPage() {
             storeLimit: 1,
             trialEndsAt: null,
             planName: null,
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
           });
         }
       }
@@ -237,10 +247,16 @@ export default function StoresPage() {
     trialEndDate && !Number.isNaN(trialEndDate.getTime())
       ? Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       : null;
+  const currentPeriodEndDate = subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
   const planLabel = subscription.planName ?? 'TableQR Standard';
   const checkoutActionLabel = getCheckoutActionLabel(subscription.status);
   const showLimitBanner = isLimited && stores.length > 0;
   const trialEndText = formatKoreanShortDate(trialEndDate);
+  const currentPeriodEndText = formatKoreanShortDate(currentPeriodEndDate);
+  const cancellationNotice =
+    subscription.cancelAtPeriodEnd && currentPeriodEndText
+      ? `${currentPeriodEndText}에 자동 해지됩니다.`
+      : null;
   const limitBannerCopy = subscription.status === 'none'
     ? {
         title: '두 번째 매장은 7일 무료 체험 후 이용할 수 있어요.',
@@ -292,7 +308,7 @@ export default function StoresPage() {
               action: checkoutActionLabel,
             };
 
-  const billingBanner: BannerConfig | null = (() => {
+  const rawBillingBanner: BannerConfig | null = (() => {
     if (subscriptionLoading) return null;
     switch (subscription.status) {
       case 'trialing':
@@ -346,6 +362,16 @@ export default function StoresPage() {
         return null;
     }
   })();
+
+  const billingBanner =
+    cancellationNotice && rawBillingBanner
+      ? {
+          ...rawBillingBanner,
+          body: rawBillingBanner.body
+            ? `${rawBillingBanner.body} ${cancellationNotice}`
+            : cancellationNotice,
+        }
+      : rawBillingBanner;
 
   const billingBannerNode = billingBanner ? (
     <div className={`mb-8 rounded-2xl border p-5 text-sm ${BANNER_STYLES[billingBanner.tone].wrapper}`}>
