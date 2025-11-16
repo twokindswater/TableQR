@@ -8,7 +8,6 @@ import { Store } from '@/types/database';
 import { StoreCard } from '@/components/stores/store-card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { Spinner } from '@/components/ui/spinner';
 
 type SubscriptionStatus =
@@ -117,11 +116,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { CHECKOUT_PATH } from '@/lib/checkout';
+import { useSession } from '@/hooks/use-session';
+
+type StoreWithMenuCount = Store & { menuCount: number }
 
 export default function StoresPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const [stores, setStores] = useState<Store[]>([]);
+  const { data: session, status: sessionStatus } = useSession();
+  const [stores, setStores] = useState<StoreWithMenuCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionSnapshot>({
     status: 'loading',
@@ -137,13 +140,18 @@ export default function StoresPage() {
     const loadStores = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('stores')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setStores(data || []);
+        const response = await fetch('/api/stores', { cache: 'no-store' })
+        if (!response.ok) {
+          throw new Error('failed to load stores')
+        }
+        const payload = await response.json()
+        const storeData: StoreWithMenuCount[] = Array.isArray(payload?.stores)
+          ? payload.stores.map((store: StoreWithMenuCount) => ({
+              ...store,
+              menuCount: typeof store.menuCount === 'number' ? store.menuCount : 0,
+            }))
+          : []
+        setStores(storeData);
       } catch (error) {
         console.error('스토어 조회 실패:', error);
         toast({
@@ -156,8 +164,17 @@ export default function StoresPage() {
       }
     };
 
+    if (sessionStatus === 'loading') {
+      return
+    }
+    if (sessionStatus !== 'authenticated' || !session?.user?.id) {
+      setStores([])
+      setLoading(false)
+      return
+    }
+
     loadStores();
-  }, [toast]);
+  }, [session?.user?.id, sessionStatus, toast]);
 
   // After checkout redirect (?checkoutId=...), force a billing sync
   useEffect(() => {
@@ -413,17 +430,23 @@ export default function StoresPage() {
   };
 
   const handleDeleteClick = async (storeId: number) => {
+    if (!session?.user?.id) {
+      toast({
+        title: '삭제 권한이 없습니다',
+        description: '다시 로그인한 뒤 시도해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const confirmed = window.confirm('정말로 이 가게를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.');
     
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('stores')
-        .delete()
-        .eq('store_id', storeId);
-
-      if (error) throw error;
+      const response = await fetch(`/api/stores/${storeId}`, { method: 'DELETE' })
+      if (!response.ok) {
+        throw new Error('failed to delete store')
+      }
       
       toast({
         title: '삭제 완료',
@@ -524,7 +547,7 @@ export default function StoresPage() {
               <StoreCard
                 key={store.store_id}
                 store={store}
-                menuCount={0}
+                menuCount={store.menuCount}
                 onDelete={handleDeleteClick}
               />
             ))}

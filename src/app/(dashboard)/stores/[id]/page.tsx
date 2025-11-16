@@ -3,7 +3,6 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/use-session';
-import { supabase } from '@/lib/supabase';
 import { Tables } from '@/types/database.generated';
 import { Loader2 } from 'lucide-react';
 import { CategoryList } from '@/components/menus/category-list';
@@ -18,7 +17,7 @@ type Menu = Tables<'menus'>;
 
 export default function StoreDashboardPage() {
   const params = useParams();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [store, setStore] = useState<Store | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
@@ -27,38 +26,27 @@ export default function StoreDashboardPage() {
   useEffect(() => {
     const loadStoreData = async () => {
       try {
+        if (sessionStatus !== 'authenticated') {
+          return
+        }
         setLoading(true);
         const storeId = params.id;
 
-        // 스토어 정보 로드
-        const { data: storeData, error: storeError } = await supabase
-          .from('stores')
-          .select('*')
-          .eq('store_id', storeId)
-          .single();
+        const response = await fetch(`/api/stores/${storeId}`, { cache: 'no-store' })
+        if (response.status === 404) {
+          setStore(null)
+          setCategories([])
+          setMenus([])
+          return
+        }
+        if (!response.ok) {
+          throw new Error('failed to load store')
+        }
 
-        if (storeError) throw storeError;
-        setStore(storeData);
-
-        // 카테고리 로드
-        const { data: categoryData, error: categoryError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('store_id', storeId)
-          .order('display_order', { ascending: true });
-
-        if (categoryError) throw categoryError;
-        setCategories(categoryData || []);
-
-        // 메뉴 로드
-        const { data: menuData, error: menuError } = await supabase
-          .from('menus')
-          .select('*')
-          .eq('store_id', storeId)
-          .order('display_order', { ascending: true });
-
-        if (menuError) throw menuError;
-        setMenus(menuData || []);
+        const payload = await response.json()
+        setStore(payload?.store ?? null);
+        setCategories(Array.isArray(payload?.categories) ? payload.categories : []);
+        setMenus(Array.isArray(payload?.menus) ? payload.menus : []);
 
       } catch (error) {
         console.error('데이터 로드 실패:', error);
@@ -70,7 +58,7 @@ export default function StoreDashboardPage() {
     if (params.id) {
       loadStoreData();
     }
-  }, [params.id]);
+  }, [params.id, sessionStatus]);
 
   if (loading) {
     return (
@@ -161,4 +149,3 @@ export default function StoreDashboardPage() {
     </div>
   );
 }
-

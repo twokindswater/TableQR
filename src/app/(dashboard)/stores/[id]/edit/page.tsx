@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/use-session';
 import { useRouter, useParams } from 'next/navigation';
 import { StoreForm } from '@/components/stores/store-form';
-import { getStoreById, updateStore } from '@/lib/supabase-helpers';
 import { Store, StoreInsert } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { Spinner } from '@/components/ui/spinner';
@@ -25,7 +24,22 @@ export default function EditStorePage() {
   const loadStore = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await getStoreById(storeId);
+      const response = await fetch(`/api/stores/${storeId}`, { cache: 'no-store' })
+      if (response.status === 404) {
+        toast({
+          title: '오류',
+          description: '스토어를 찾을 수 없습니다.',
+          variant: 'destructive',
+        });
+        router.push('/stores');
+        return;
+      }
+      if (!response.ok) {
+        throw new Error('failed to load store');
+      }
+
+      const payload = await response.json();
+      const data = payload?.store ?? null;
 
       if (!data) {
         toast({
@@ -74,7 +88,14 @@ export default function EditStorePage() {
     }
 
     try {
-      await updateStore(storeId, data);
+      const response = await fetch(`/api/stores/${storeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) {
+        throw new Error('failed to update store')
+      }
 
       toast({
         title: '성공',
@@ -136,4 +157,3 @@ export default function EditStorePage() {
     </div>
   );
 }
-
