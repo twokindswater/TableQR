@@ -3,7 +3,6 @@
 import { useSession } from '@/hooks/use-session';
 import { useRouter } from 'next/navigation';
 import { StoreForm } from '@/components/stores/store-form';
-import { createStore } from '@/lib/supabase-helpers';
 import { StoreInsert } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
@@ -35,13 +34,15 @@ export default function NewStorePage() {
       return;
     }
 
-    const storeData: StoreInsert = {
-      ...data,
-      user_id: session.user.id,
-    };
-
     try {
-      const newStore = await createStore(storeData);
+      const response = await fetch('/api/stores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) {
+        throw new Error('failed to create store')
+      }
 
       toast({
         title: '성공',
@@ -87,4 +88,3 @@ export default function NewStorePage() {
     </div>
   );
 }
-

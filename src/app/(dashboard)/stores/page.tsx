@@ -8,7 +8,6 @@ import { Store } from '@/types/database';
 import { StoreCard } from '@/components/stores/store-card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 import { Spinner } from '@/components/ui/spinner';
 
 type SubscriptionStatus =
@@ -117,10 +116,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { CHECKOUT_PATH } from '@/lib/checkout';
+import { useSession } from '@/hooks/use-session';
 
 export default function StoresPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionSnapshot>({
@@ -135,15 +136,17 @@ export default function StoresPage() {
 
   useEffect(() => {
     const loadStores = async () => {
+      if (sessionStatus !== 'authenticated' || !session?.user?.id) {
+        return;
+      }
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('stores')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setStores(data || []);
+        const response = await fetch('/api/stores', { cache: 'no-store' })
+        if (!response.ok) {
+          throw new Error('failed to load stores')
+        }
+        const payload = await response.json()
+        setStores(Array.isArray(payload?.stores) ? payload.stores : []);
       } catch (error) {
         console.error('스토어 조회 실패:', error);
         toast({
@@ -157,7 +160,7 @@ export default function StoresPage() {
     };
 
     loadStores();
-  }, [toast]);
+  }, [session?.user?.id, sessionStatus, toast]);
 
   // After checkout redirect (?checkoutId=...), force a billing sync
   useEffect(() => {
@@ -413,17 +416,23 @@ export default function StoresPage() {
   };
 
   const handleDeleteClick = async (storeId: number) => {
+    if (!session?.user?.id) {
+      toast({
+        title: '삭제 권한이 없습니다',
+        description: '다시 로그인한 뒤 시도해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const confirmed = window.confirm('정말로 이 가게를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.');
     
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('stores')
-        .delete()
-        .eq('store_id', storeId);
-
-      if (error) throw error;
+      const response = await fetch(`/api/stores/${storeId}`, { method: 'DELETE' })
+      if (!response.ok) {
+        throw new Error('failed to delete store')
+      }
       
       toast({
         title: '삭제 완료',
