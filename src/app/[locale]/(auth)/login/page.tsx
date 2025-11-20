@@ -2,14 +2,23 @@
 
 import { signIn } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
+import { useLocale, useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { useMemo } from "react"
 
 export default function LoginPage() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams?.get("callbackUrl") || "/"
+  const locale = useLocale()
+  const tAuth = useTranslations("auth.login")
+  const tCommon = useTranslations("common")
+
+  const callbackUrl = useMemo(() => {
+    const param = searchParams?.get("callbackUrl")
+    return param || `/${locale}`
+  }, [locale, searchParams])
 
   const handleGoogleSignIn = async () => {
     try {
@@ -19,38 +28,30 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Login error:", error)
       toast({
-        title: "로그인 실패",
-        description: "다시 시도해주세요.",
+        title: tAuth("errorTitle"),
+        description: tAuth("errorDescription"),
         variant: "destructive",
       })
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-light to-white p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-light to-white p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-6">
+        <CardHeader className="space-y-6 text-center">
           <div className="flex justify-center">
-            <div className="w-24 h-24 bg-primary rounded-2xl flex items-center justify-center">
+            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-primary">
               <span className="text-4xl font-bold text-white">QR</span>
             </div>
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold">TableQR</CardTitle>
-            <CardDescription className="text-lg mt-2">
-              QR 코드로 시작하는<br />스마트 메뉴 관리
-            </CardDescription>
-            <p className="mt-3 text-sm text-gray-500">
-              로그인 후 7일 무료 체험을 시작하고 다점포 기능을 바로 확인해보세요.
-            </p>
+            <CardTitle className="text-3xl font-bold">{tCommon("brand")}</CardTitle>
+            <CardDescription className="mt-2 text-lg">{tAuth("subtitle")}</CardDescription>
+            <p className="mt-3 text-sm text-gray-500">{tAuth("helper")}</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button 
-            variant="outline" 
-            className="w-full h-12 text-base"
-            onClick={handleGoogleSignIn}
-          >
+          <Button variant="outline" className="h-12 w-full text-base" onClick={handleGoogleSignIn}>
             <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
               <path
                 fill="currentColor"
@@ -69,12 +70,10 @@ export default function LoginPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Google로 로그인
+            {tAuth("button")}
           </Button>
-          
-          <p className="text-center text-sm text-gray-500">
-            간편하게 시작하세요
-          </p>
+
+          <p className="text-center text-sm text-gray-500">{tAuth("footnote")}</p>
         </CardContent>
       </Card>
     </div>

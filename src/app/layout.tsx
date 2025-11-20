@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { getLocale } from "next-intl/server"
 import "./globals.css"
-import { Toaster } from "@/components/ui/toaster"
-import { SessionProvider } from "@/components/providers/session-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -11,20 +10,16 @@ export const metadata: Metadata = {
   description: "QR 코드로 시작하는 스마트 메뉴 관리 서비스",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const locale = await getLocale()
+
   return (
-    <html lang="ko" suppressHydrationWarning>
-      <body className={inter.className}>
-        <SessionProvider>
-          {children}
-          <Toaster />
-        </SessionProvider>
-      </body>
+    <html lang={locale} suppressHydrationWarning>
+      <body className={inter.className}>{children}</body>
     </html>
   )
 }
-

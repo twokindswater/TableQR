@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
-import { Store } from '@/types/database';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Building2, Phone, Clock, Edit, Trash2 } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Store } from "@/types/database";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Building2, Phone, Clock, Edit, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { Link } from "@/navigation";
+import { useTranslations } from "next-intl";
 
 interface StoreCardProps {
   store: Store;
@@ -14,6 +15,8 @@ interface StoreCardProps {
 }
 
 export function StoreCard({ store, menuCount = 0, onDelete }: StoreCardProps) {
+  const t = useTranslations("dashboard.stores.card")
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* 스토어 로고 */}
@@ -21,7 +24,7 @@ export function StoreCard({ store, menuCount = 0, onDelete }: StoreCardProps) {
         {store.logo_url && store.logo_url.trim() !== '' && store.logo_url.startsWith('http') ? (
           <Image
             src={store.logo_url}
-            alt={store.name || '매장'}
+            alt={store.name || t("noName")}
             fill
             className="object-cover"
           />
@@ -34,10 +37,10 @@ export function StoreCard({ store, menuCount = 0, onDelete }: StoreCardProps) {
 
       <CardContent className="pt-4">
         {/* 스토어 이름 */}
-        <h3 className="text-xl font-bold mb-3 truncate">{store.name || '매장명 없음'}</h3>
+        <h3 className="text-xl font-bold mb-3 truncate">{store.name || t("noName")}</h3>
 
         {/* 메뉴 개수 */}
-        <p className="text-sm text-gray-600 mb-3">메뉴 {menuCount}개</p>
+        <p className="text-sm text-gray-600 mb-3">{t("menuCount", { count: menuCount })}</p>
 
         {/* 스토어 정보 */}
         <div className="space-y-2 text-sm text-gray-600">
@@ -68,7 +71,7 @@ export function StoreCard({ store, menuCount = 0, onDelete }: StoreCardProps) {
       <CardFooter className="flex gap-2 pt-0">
         <Link href={`/stores/${store.store_id}`} className="flex-1">
           <Button variant="default" className="w-full">
-            관리하기
+            {t("manage")}
           </Button>
         </Link>
         <Link href={`/stores/${store.store_id}/edit`}>
@@ -90,4 +93,3 @@ export function StoreCard({ store, menuCount = 0, onDelete }: StoreCardProps) {
     </Card>
   );
 }
-
