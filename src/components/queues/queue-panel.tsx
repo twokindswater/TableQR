@@ -285,16 +285,30 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     const checkExpiredQueues = async () => {
       try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const oneHourAgoISO = oneHourAgo.toISOString();
         
-        const { error } = await supabase
+        // status 1 (준비 완료)이고 called_at이 1시간 이상 지난 항목 삭제
+        const { error: error1 } = await supabase
+          .from('queues')
+          .delete()
+          .eq('store_id', storeId)
+          .eq('status', 1)
+          .lt('called_at', oneHourAgoISO);
+        
+        if (error1 && error1.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error('자동 삭제 실패 (준비 완료):', error1);
+        }
+        
+        // status 2 (완료)이고 completed_at이 1시간 이상 지난 항목 삭제
+        const { error: error2 } = await supabase
           .from('queues')
           .delete()
           .eq('store_id', storeId)
           .eq('status', 2)
-          .lt('completed_at', oneHourAgo.toISOString());
+          .lt('completed_at', oneHourAgoISO);
         
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.error('자동 삭제 실패:', error);
+        if (error2 && error2.code !== 'PGRST116') { // PGRST116 = no rows returned
+          console.error('자동 삭제 실패 (완료):', error2);
         }
       } catch (error) {
         console.error('자동 삭제 체크 실패:', error);
