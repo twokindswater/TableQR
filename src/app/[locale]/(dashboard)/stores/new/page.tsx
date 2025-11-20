@@ -1,34 +1,35 @@
 'use client';
 
 import { useSession } from '@/hooks/use-session';
-import { useRouter } from 'next/navigation';
+import { useRouter, Link } from '@/navigation';
 import { StoreForm } from '@/components/stores/store-form';
 import { StoreInsert } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useTranslations, useLocale } from 'next-intl';
 
 export default function NewStorePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
+  const t = useTranslations('dashboard.storeEditor');
+  const locale = useLocale();
 
-  // 인증 확인
   if (status === 'unauthenticated') {
-    router.push('/login');
+    router.push('/login', { locale });
     return null;
   }
 
   if (status === 'loading') {
-    return <div>Loading...</div>;
+    return <div>{t('loading')}</div>;
   }
 
   const handleSubmit = async (data: StoreInsert) => {
     if (!session?.user?.id) {
       toast({
-        title: '오류',
-        description: '로그인이 필요합니다.',
+        title: t('create.errorTitle'),
+        description: t('authRequired'),
         variant: 'destructive',
       });
       return;
@@ -39,50 +40,45 @@ export default function NewStorePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      })
+      });
       if (!response.ok) {
-        throw new Error('failed to create store')
+        throw new Error('failed to create store');
       }
 
       toast({
-        title: '성공',
-        description: '새로운 가게가 등록되었습니다!',
+        title: t('create.successTitle'),
+        description: t('create.successDescription'),
       });
 
-      // 스토어 목록 페이지로 이동
-      router.push('/stores');
+      router.push('/stores', { locale });
     } catch (error) {
       console.error('스토어 생성 실패:', error);
       toast({
-        title: '오류',
-        description: '가게 등록에 실패했습니다. 다시 시도해주세요.',
+        title: t('create.errorTitle'),
+        description: t('create.errorDescription'),
         variant: 'destructive',
       });
     }
   };
 
   const handleCancel = () => {
-    router.push('/stores');
+    router.push('/stores', { locale });
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        {/* 헤더 */}
+      <div className="mx-auto max-w-3xl">
         <div className="mb-8">
           <Link href="/stores">
             <Button variant="ghost" className="mb-4">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              뒤로가기
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {t('back')}
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold mb-2">새 가게 등록</h1>
-          <p className="text-gray-600">
-            가게 정보를 입력하고 메뉴 관리를 시작하세요
-          </p>
+          <h1 className="mb-2 text-3xl font-bold">{t('create.title')}</h1>
+          <p className="text-gray-600">{t('create.description')}</p>
         </div>
 
-        {/* 폼 */}
         <StoreForm onSubmit={handleSubmit} onCancel={handleCancel} />
       </div>
     </div>

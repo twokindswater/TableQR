@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 interface SpinnerProps {
@@ -24,13 +27,14 @@ export function Spinner({ size = "md", className }: SpinnerProps) {
 }
 
 export function LoadingScreen() {
+  const t = useTranslations("common.status")
+
   return (
     <div className="flex h-screen w-full items-center justify-center">
       <div className="text-center space-y-4">
         <Spinner size="lg" />
-        <p className="text-sm text-gray-500">로딩 중...</p>
+        <p className="text-sm text-gray-500">{t("loading")}</p>
       </div>
     </div>
   )
 }
-

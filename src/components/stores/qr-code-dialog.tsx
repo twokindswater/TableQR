@@ -1,4 +1,5 @@
-'use client';
+"use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
@@ -93,4 +94,3 @@ export function QRCodeDialog({ storeId, storeName }: QRCodeDialogProps) {
     </Dialog>
   );
 }
-

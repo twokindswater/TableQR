@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,7 @@ export function StoreForm({
   onCancel,
   isEdit = false,
 }: StoreFormProps) {
+  const t = useTranslations('dashboard.storeForm');
   const [loading, setLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(
     initialData?.logo_url || null
@@ -117,14 +119,14 @@ export function StoreForm({
       }
 
       toast({
-        title: '업로드 성공',
-        description: '이미지가 성공적으로 업로드되었습니다.',
+        title: t('toasts.uploadSuccess'),
+        description: t('toasts.uploadSuccessDescription'),
       });
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
       toast({
-        title: '업로드 실패',
-        description: '이미지 업로드에 실패했습니다. 다시 시도해주세요.',
+        title: t('toasts.uploadError'),
+        description: t('toasts.uploadErrorDescription'),
         variant: 'destructive',
       });
     } finally {
@@ -168,18 +170,18 @@ export function StoreForm({
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>기본 정보</CardTitle>
+          <CardTitle>{t('basicInfo')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 매장명 */}
           <div className="space-y-2">
             <Label htmlFor="name">
-              매장명 <span className="text-red-500">*</span>
+              {t('fields.name.label')} <span className="text-red-500">*</span>
             </Label>
             <Input
               id="name"
-              {...register('name', { required: '매장명은 필수입니다' })}
-              placeholder="예: 카페 모카"
+              {...register('name', { required: t('fields.name.required') })}
+              placeholder={t('fields.name.placeholder')}
               disabled={loading}
             />
             {errors.name && (
@@ -189,14 +191,14 @@ export function StoreForm({
 
           {/* 매장 로고 */}
           <div className="space-y-2">
-            <Label htmlFor="logo">매장 로고</Label>
+            <Label htmlFor="logo">{t('fields.logo.label')}</Label>
             <div className="flex items-start gap-4">
               {/* 로고 미리보기 */}
               {logoPreview && logoPreview.trim() !== '' ? (
                 <div className="relative w-32 h-32 border rounded-full overflow-hidden">
                   <NextImage
                     src={logoPreview}
-                    alt="로고 미리보기"
+                    alt={t('fields.logo.alt')}
                     fill
                     className="object-cover"
                   />
@@ -226,23 +228,21 @@ export function StoreForm({
                   disabled={loading}
                   className="cursor-pointer"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  원형으로 표시됩니다 (PNG, JPG)
-                </p>
+                <p className="mt-1 text-sm text-gray-500">{t('fields.logo.help')}</p>
               </div>
             </div>
           </div>
 
           {/* 커버 이미지 */}
           <div className="space-y-2">
-            <Label htmlFor="cover">커버 이미지</Label>
+            <Label htmlFor="cover">{t('fields.cover.label')}</Label>
             <div className="flex items-start gap-4">
               {/* 커버 이미지 미리보기 */}
               {coverPreview && coverPreview.trim() !== '' ? (
                 <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
                   <NextImage
                     src={coverPreview}
-                    alt="커버 이미지 미리보기"
+                    alt={t('fields.cover.alt')}
                     fill
                     className="object-cover"
                   />
@@ -272,31 +272,29 @@ export function StoreForm({
                   disabled={loading}
                   className="cursor-pointer"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  16:9 비율 권장 (PNG, JPG)
-                </p>
+                <p className="mt-1 text-sm text-gray-500">{t('fields.cover.help')}</p>
               </div>
             </div>
           </div>
 
           {/* 연락처 */}
           <div className="space-y-2">
-            <Label htmlFor="phone">연락처</Label>
+            <Label htmlFor="phone">{t('fields.phone.label')}</Label>
             <Input
               id="phone"
               {...register('phone')}
-              placeholder="010-1234-5678"
+              placeholder={t('fields.phone.placeholder')}
               disabled={loading}
             />
           </div>
 
           {/* 영업시간 */}
           <div className="space-y-2">
-            <Label htmlFor="business_hours">영업시간</Label>
+            <Label htmlFor="business_hours">{t('fields.businessHours.label')}</Label>
             <Textarea
               id="business_hours"
               {...register('business_hours')}
-              placeholder="월-금: 09:00 - 22:00&#10;토-일: 10:00 - 20:00"
+              placeholder={t('fields.businessHours.placeholder')}
               rows={3}
               disabled={loading}
             />
@@ -306,31 +304,29 @@ export function StoreForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>추가 정보</CardTitle>
+          <CardTitle>{t('additionalInfo')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 주의사항 */}
           <div className="space-y-2">
-            <Label htmlFor="notice">주의사항</Label>
+            <Label htmlFor="notice">{t('fields.notice.label')}</Label>
             <Textarea
               id="notice"
               {...register('notice')}
-              placeholder="고객에게 알리고 싶은 중요한 공지사항을 입력하세요"
+              placeholder={t('fields.notice.placeholder')}
               rows={3}
               disabled={loading}
             />
-            <p className="text-sm text-gray-500">
-              예: 주차 가능, 반려동물 동반 가능 등
-            </p>
+            <p className="text-sm text-gray-500">{t('fields.notice.hint')}</p>
           </div>
 
           {/* 매장 소개 */}
           <div className="space-y-2">
-            <Label htmlFor="description">매장 소개</Label>
+            <Label htmlFor="description">{t('fields.description.label')}</Label>
             <Textarea
               id="description"
               {...register('description')}
-              placeholder="매장에 대한 소개를 작성해주세요"
+              placeholder={t('fields.description.placeholder')}
               rows={5}
               disabled={loading}
             />
@@ -340,17 +336,12 @@ export function StoreForm({
 
       {/* 버튼 */}
       <div className="flex gap-3 justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={loading}
-        >
-          취소
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          {t('buttons.cancel')}
         </Button>
         <Button type="submit" disabled={loading}>
           {loading && <Spinner size="sm" className="mr-2" />}
-          {isEdit ? '수정하기' : '등록하기'}
+          {isEdit ? t('buttons.update') : t('buttons.create')}
         </Button>
       </div>
 

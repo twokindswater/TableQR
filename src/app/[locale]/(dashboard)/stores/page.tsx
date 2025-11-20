@@ -1,14 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Plus, Store as StoreIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Store as StoreIcon } from "lucide-react";
+import { useRouter } from "@/navigation";
+import { useLocale, useTranslations } from "next-intl";
 
-import { Store } from '@/types/database';
-import { StoreCard } from '@/components/stores/store-card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Spinner } from '@/components/ui/spinner';
+import { Store } from "@/types/database";
+import { StoreCard } from "@/components/stores/store-card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Spinner } from "@/components/ui/spinner";
+import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 
 type SubscriptionStatus =
   | 'loading'
@@ -81,29 +83,21 @@ interface BannerConfig {
   secondaryAction?: () => void
 }
 
-function getCheckoutActionLabel(status: SubscriptionStatus) {
-  switch (status) {
-    case 'none':
-      return '7일 무료 체험 시작'
-    case 'trialing':
-      return '체험 유지하기'
-    case 'active':
-      return '구독 관리하기'
-    case 'canceled':
-      return '다시 구독하기'
-    case 'past_due':
-    case 'unpaid':
-    case 'incomplete':
-    case 'incomplete_expired':
-      return '결제 다시 진행하기'
-    default:
-      return '결제 진행하기'
-  }
+interface LimitBannerCopy {
+  title: string
+  body: string
+  button: string
 }
 
-function formatKoreanShortDate(date: Date | null) {
+interface UpgradeCopy {
+  title: string
+  description: string
+  action: string
+}
+
+function formatShortDate(locale: string, date: Date | null) {
   if (!date || Number.isNaN(date.getTime())) return null
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+  return new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" }).format(date)
 }
 import {
   AlertDialog,
@@ -124,6 +118,9 @@ export default function StoresPage() {
   const { toast } = useToast();
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
+  const locale = useLocale();
+  const t = useTranslations("dashboard.stores");
+  const tCommon = useTranslations("common.actions");
   const [stores, setStores] = useState<StoreWithMenuCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionSnapshot>({
@@ -153,10 +150,10 @@ export default function StoresPage() {
           : []
         setStores(storeData);
       } catch (error) {
-        console.error('스토어 조회 실패:', error);
+        console.error('Failed to fetch stores:', error);
         toast({
-          title: '오류',
-          description: '스토어 목록을 불러오는데 실패했습니다.',
+          title: t("toasts.loadError.title"),
+          description: t("toasts.loadError.description"),
           variant: 'destructive',
         });
       } finally {
@@ -174,7 +171,7 @@ export default function StoresPage() {
     }
 
     loadStores();
-  }, [session?.user?.id, sessionStatus, toast]);
+  }, [session?.user?.id, sessionStatus, t, toast]);
 
   // After checkout redirect (?checkoutId=...), force a billing sync
   useEffect(() => {
@@ -234,7 +231,7 @@ export default function StoresPage() {
           cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
         });
       } catch (error) {
-        console.error('구독 정보 조회 실패:', error);
+        console.error('Failed to load subscription:', error);
         if (active) {
           setSubscription({
             status: 'none',
@@ -266,30 +263,45 @@ export default function StoresPage() {
       : null;
   const currentPeriodEndDate = subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
   const planLabel = subscription.planName ?? 'TableQR Standard';
-  const checkoutActionLabel = getCheckoutActionLabel(subscription.status);
+  const checkoutLabels = useMemo<
+    Partial<Record<Exclude<SubscriptionStatus, "loading">, string>>
+  >(
+    () => ({
+      none: t("checkoutActions.none"),
+      trialing: t("checkoutActions.trialing"),
+      active: t("checkoutActions.active"),
+      canceled: t("checkoutActions.canceled"),
+      past_due: t("checkoutActions.past_due"),
+      unpaid: t("checkoutActions.unpaid"),
+      incomplete: t("checkoutActions.incomplete"),
+      incomplete_expired: t("checkoutActions.incomplete_expired"),
+    }),
+    [t],
+  )
+  const checkoutActionLabel =
+    checkoutLabels[subscription.status as Exclude<SubscriptionStatus, "loading">] ??
+    t("checkoutActions.default");
   const showLimitBanner = isLimited && stores.length > 0;
-  const trialEndText = formatKoreanShortDate(trialEndDate);
-  const currentPeriodEndText = formatKoreanShortDate(currentPeriodEndDate);
+  const trialEndText = formatShortDate(locale, trialEndDate);
+  const currentPeriodEndText = formatShortDate(locale, currentPeriodEndDate);
   const cancellationNotice =
     subscription.cancelAtPeriodEnd && currentPeriodEndText
-      ? `${currentPeriodEndText}에 자동 해지됩니다.`
+      ? t("billingBanner.cancellationNotice", { date: currentPeriodEndText })
       : null;
-  const limitBannerCopy = subscription.status === 'none'
-    ? {
-        title: '두 번째 매장은 7일 무료 체험 후 이용할 수 있어요.',
-        body: 'Trial을 시작하면 다점포 관리, 푸시 알림, 이미지 업로드가 즉시 열립니다.',
-        button: '7일 무료 체험 시작',
-      }
-    : {
-        title: '결제가 필요한 상태입니다',
-        body: '결제를 완료하면 모든 매장과 메뉴 편집 기능이 다시 활성화됩니다.',
-        button: checkoutActionLabel,
-      };
+  const limitBannerCopy = useMemo(() => {
+    if (subscription.status === "none") {
+      return t.raw("limitBanner.trial") as LimitBannerCopy
+    }
+    return {
+      ...(t.raw("limitBanner.renewal") as LimitBannerCopy),
+      button: checkoutActionLabel,
+    }
+  }, [checkoutActionLabel, subscription.status, t])
   const handleCheckoutRedirect = () => {
     if (!CHECKOUT_PATH) {
       toast({
-        title: '결제 설정 필요',
-        description: '관리자에게 Polar 상품 ID를 설정해달라고 요청해주세요.',
+        title: t("toasts.checkoutMissing.title"),
+        description: t("toasts.checkoutMissing.description"),
         variant: 'destructive',
       });
       return;
@@ -300,30 +312,21 @@ export default function StoresPage() {
   const handleOpenPortal = () => {
     router.push('/api/billing/portal');
   };
-  const upgradeDialogCopy =
-    subscription.status === 'none'
-      ? {
-          title: '다점포 관리는 Trial 시작 후 이용할 수 있어요',
-          description: '무료 체험을 시작하면 두 번째 매장부터 실시간으로 관리할 수 있습니다.',
-          action: '7일 무료 체험 시작',
-        }
-      : needsRenewal
-        ? {
-            title: '결제를 완료해야 추가 매장을 등록할 수 있어요',
-            description: '결제를 다시 진행하면 저장된 매장을 그대로 이어서 사용할 수 있습니다.',
-            action: '결제 다시 진행하기',
-          }
-        : subscription.status === 'canceled'
-          ? {
-              title: '구독이 해지된 상태입니다',
-              description: '다시 구독하면 다점포 관리와 푸시 알림 기능이 다시 활성화됩니다.',
-              action: '다시 구독하기',
-            }
-          : {
-              title: '업그레이드가 필요합니다',
-              description: '다점포 관리 기능을 이용하려면 구독이 필요합니다.',
-              action: checkoutActionLabel,
-            };
+  const upgradeDialogCopy = useMemo<UpgradeCopy>(() => {
+    if (subscription.status === "none") {
+      return t.raw("upgradeDialog.trial") as UpgradeCopy
+    }
+    if (needsRenewal) {
+      return t.raw("upgradeDialog.renewal") as UpgradeCopy
+    }
+    if (subscription.status === "canceled") {
+      return t.raw("upgradeDialog.canceled") as UpgradeCopy
+    }
+    return {
+      ...(t.raw("upgradeDialog.default") as UpgradeCopy),
+      action: checkoutActionLabel,
+    }
+  }, [checkoutActionLabel, needsRenewal, subscription.status, t])
 
   const rawBillingBanner: BannerConfig | null = (() => {
     if (subscriptionLoading) return null;
@@ -331,48 +334,48 @@ export default function StoresPage() {
       case 'trialing':
         return {
           tone: 'warning',
-          title: trialDaysLeft !== null ? `무료 체험 D-${trialDaysLeft}` : '무료 체험 이용 중',
+          title: trialDaysLeft !== null ? t('billingBanner.trialing.titleCountdown', { days: trialDaysLeft }) : t('billingBanner.trialing.titleDefault'),
           body: trialEndText
-            ? `${trialEndText}까지 모든 기능을 사용할 수 있어요. 결제/취소는 언제든 구독 관리에서 가능합니다.`
-            : '결제/취소는 언제든 구독 관리에서 가능합니다.',
-          actionLabel: '구독 관리',
+            ? t('billingBanner.trialing.body', { date: trialEndText })
+            : t('billingBanner.trialing.bodyNoDate'),
+          actionLabel: t('billingBanner.trialing.action'),
           action: handleOpenPortal,
         };
       case 'active':
         return {
           tone: 'success',
-          title: `${planLabel} 이용 중`,
-          body: '다점포, 실시간 대기 알림, 이미지 업로드까지 모두 활성화되었습니다.',
-          actionLabel: '구독 관리',
+          title: t('billingBanner.active.title', { plan: planLabel }),
+          body: t('billingBanner.active.body'),
+          actionLabel: t('billingBanner.active.action'),
           action: handleOpenPortal,
         };
       case 'none':
         return {
           tone: 'info',
-          title: '첫 매장은 무료로 시작할 수 있어요',
-          body: '7일 무료 체험을 시작하면 다점포 관리와 푸시 알림이 즉시 열립니다.',
-          actionLabel: '7일 무료 체험 시작',
+          title: t('billingBanner.none.title'),
+          body: t('billingBanner.none.body'),
+          actionLabel: t('billingBanner.none.action'),
           action: handleCheckoutRedirect,
         };
       case 'canceled':
         return {
           tone: 'warning',
-          title: '구독이 해지된 상태입니다',
-          body: '다시 구독하면 저장된 매장을 그대로 이어서 사용할 수 있어요.',
-          actionLabel: '다시 구독하기',
+          title: t('billingBanner.canceled.title'),
+          body: t('billingBanner.canceled.body'),
+          actionLabel: t('billingBanner.canceled.action'),
           action: handleCheckoutRedirect,
-          secondaryLabel: '구독 관리',
+          secondaryLabel: t('billingBanner.canceled.secondary'),
           secondaryAction: handleOpenPortal,
         };
       default:
         if (needsRenewal) {
           return {
             tone: 'danger',
-            title: '결제가 필요해요',
-            body: '결제를 완료해야 모든 매장을 계속 관리할 수 있습니다.',
-            actionLabel: '결제 다시 진행하기',
+            title: t('billingBanner.renewal.title'),
+            body: t('billingBanner.renewal.body'),
+            actionLabel: t('billingBanner.renewal.action'),
             action: handleCheckoutRedirect,
-            secondaryLabel: '구독 관리',
+            secondaryLabel: t('billingBanner.renewal.secondary'),
             secondaryAction: handleOpenPortal,
           };
         }
@@ -432,13 +435,13 @@ export default function StoresPage() {
   const handleDeleteClick = async (storeId: number) => {
     if (!session?.user?.id) {
       toast({
-        title: '삭제 권한이 없습니다',
-        description: '다시 로그인한 뒤 시도해주세요.',
+        title: t("toasts.deleteUnauthorized.title"),
+        description: t("toasts.deleteUnauthorized.description"),
         variant: 'destructive',
       });
       return;
     }
-    const confirmed = window.confirm('정말로 이 가게를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.');
+    const confirmed = window.confirm(t("confirmDelete"));
     
     if (!confirmed) return;
 
@@ -449,17 +452,17 @@ export default function StoresPage() {
       }
       
       toast({
-        title: '삭제 완료',
-        description: '스토어가 성공적으로 삭제되었습니다.',
+        title: t("toasts.deleteSuccess.title"),
+        description: t("toasts.deleteSuccess.description"),
       });
       
-      // 목록 새로고침
+      // Refresh list
       setStores(stores.filter(store => store.store_id !== storeId));
     } catch (error) {
-      console.error('스토어 삭제 실패:', error);
+      console.error('Failed to delete store:', error);
       toast({
-        title: '오류',
-        description: '스토어 삭제에 실패했습니다.',
+        title: t("toasts.deleteError.title"),
+        description: t("toasts.deleteError.description"),
         variant: 'destructive',
       });
     }
@@ -481,11 +484,11 @@ export default function StoresPage() {
             {billingBannerNode}
             <div className="py-12 text-center">
               <StoreIcon className="mx-auto mb-4 h-16 w-16 text-gray-400" />
-              <h2 className="mb-2 text-2xl font-bold">아직 등록된 가게가 없습니다</h2>
-              <p className="mb-6 text-gray-600">첫 번째 가게를 등록하고 메뉴 관리를 시작해보세요!</p>
+              <h2 className="mb-2 text-2xl font-bold">{t("empty.title")}</h2>
+              <p className="mb-6 text-gray-600">{t("empty.description")}</p>
               <Button size="lg" onClick={handleAddStoreClick} disabled={subscriptionLoading}>
                 <Plus className="mr-2 h-5 w-5" />
-                가게 추가하기
+                {t("empty.button")}
               </Button>
             </div>
           </div>
@@ -498,7 +501,7 @@ export default function StoresPage() {
               <AlertDialogDescription>{upgradeDialogCopy.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>닫기</AlertDialogCancel>
+              <AlertDialogCancel>{tCommon("close")}</AlertDialogCancel>
               <AlertDialogAction onClick={handleCheckoutRedirect}>
                 {upgradeDialogCopy.action}
               </AlertDialogAction>
@@ -514,16 +517,18 @@ export default function StoresPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="mx-auto max-w-6xl">
           {billingBannerNode}
-          {/* 헤더 */}
-          <div className="mb-8 flex items-center justify-between">
+          {/* Header */}
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="mb-2 text-3xl font-bold">내 가게 목록</h1>
-              <p className="text-gray-600">총 {stores.length}개의 가게를 운영 중입니다</p>
+              <h1 className="mb-2 text-3xl font-bold">{t("heading")}</h1>
+              <p className="text-gray-600">{t("subheading", { count: stores.length })}</p>
             </div>
-            <Button onClick={handleAddStoreClick} disabled={subscriptionLoading}>
-              <Plus className="mr-2 h-5 w-5" />
-              가게 추가
-            </Button>
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+              <Button onClick={handleAddStoreClick} disabled={subscriptionLoading}>
+                <Plus className="mr-2 h-5 w-5" />
+                {t("actions.add")}
+              </Button>
+            </div>
           </div>
 
           {showLimitBanner && (
@@ -541,7 +546,7 @@ export default function StoresPage() {
             </div>
           )}
 
-          {/* 스토어 그리드 */}
+          {/* Store grid */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {stores.map((store) => (
               <StoreCard
@@ -562,7 +567,7 @@ export default function StoresPage() {
             <AlertDialogDescription>{upgradeDialogCopy.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>닫기</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon("close")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleCheckoutRedirect}>
               {upgradeDialogCopy.action}
             </AlertDialogAction>

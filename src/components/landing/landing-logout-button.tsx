@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import { signOut } from "next-auth/react"
+import { useLocale, useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
 
@@ -11,10 +12,12 @@ interface LandingLogoutButtonProps {
 
 export function LandingLogoutButton({ className }: LandingLogoutButtonProps) {
   const [pending, startTransition] = useTransition()
+  const locale = useLocale()
+  const t = useTranslations("common.actions")
 
   const handleClick = () => {
     startTransition(() => {
-      signOut({ callbackUrl: "/" })
+      signOut({ callbackUrl: `/${locale}` })
     })
   }
 
@@ -28,8 +31,7 @@ export function LandingLogoutButton({ className }: LandingLogoutButtonProps) {
         className,
       )}
     >
-      {pending ? "로그아웃 중..." : "로그아웃"}
+      {pending ? t("loggingOut") : t("logout")}
     </button>
   )
 }
-

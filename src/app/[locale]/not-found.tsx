@@ -1,22 +1,22 @@
-import Link from "next/link"
+import { Link } from "@/navigation"
 import { Button } from "@/components/ui/button"
+import { getTranslations } from "next-intl/server"
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getTranslations("common.notFound")
+
   return (
     <div className="flex h-screen flex-col items-center justify-center space-y-4">
       <div className="text-center space-y-2">
         <h1 className="text-6xl font-bold text-gray-900">404</h1>
         <h2 className="text-2xl font-semibold text-gray-700">
-          페이지를 찾을 수 없습니다
+          {t("heading")}
         </h2>
-        <p className="text-gray-500">
-          요청하신 페이지가 존재하지 않거나 이동되었습니다.
-        </p>
+        <p className="text-gray-500">{t("description")}</p>
       </div>
       <Button asChild>
-        <Link href="/">홈으로 돌아가기</Link>
+        <Link href="/">{t("cta")}</Link>
       </Button>
     </div>
   )
 }
-
