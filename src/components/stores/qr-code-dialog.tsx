@@ -22,7 +22,7 @@ interface QRCodeDialogProps {
 export function QRCodeDialog({ storeId, storeName }: QRCodeDialogProps) {
   const [open, setOpen] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const qrUrl = `https://tableqr-web.vercel.app/store/${storeId}`;
+  const qrUrl = `https://tableqr-client.greenteashirt.com/store/${storeId}`;
 
   useEffect(() => {
     if (open) {
