@@ -25,6 +25,25 @@ export type QueueNotification = Tables<'queue_notifications'>;
 export type QueueNotificationInsert = TablesInsert<'queue_notifications'>;
 export type QueueNotificationUpdate = TablesUpdate<'queue_notifications'>;
 
+// Queue Item (주문 항목) 타입
+export interface QueueItem {
+  queue_item_id: number;
+  queue_id: number;
+  menu_id: number;
+  menu_name: string;
+  quantity: number;
+  price: number;
+  created_at: string;
+}
+
+export type QueueItemInsert = Omit<QueueItem, 'queue_item_id' | 'created_at'>;
+export type QueueItemUpdate = Partial<QueueItemInsert>;
+
+// Queue with Items (주문 항목이 포함된 Queue)
+export interface QueueWithItems extends Queue {
+  items?: QueueItem[];
+}
+
 // 상태별 필터링된 Queue
 export interface FilteredQueues {
   waiting: Queue[];      // status: 0 - 대기 중

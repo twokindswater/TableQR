@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, memo } from 'react';
-import { Queue, QUEUE_STATUS_MAP } from '@/types/queue';
+import { QueueWithItems, QUEUE_STATUS_MAP } from '@/types/queue';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash } from 'lucide-react';
 
 interface QueueCardProps {
-  queue: Queue;
+  queue: QueueWithItems;
   onMarkReady: (queueId: number) => Promise<void>;
   onMarkComplete: (queueId: number) => Promise<void>;
   onDelete: (queueId: number) => Promise<void>;
@@ -121,6 +121,34 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
           </>
         )}
       </div>
+
+      {/* 주문 항목 */}
+      {queue.items && queue.items.length > 0 && (
+        <div className="mb-4 border-t pt-3">
+          <p className="text-xs text-gray-600 font-semibold mb-2">주문 내역</p>
+          <div className="space-y-1">
+            {queue.items.map((item) => (
+              <div key={item.queue_item_id} className="flex justify-between text-sm">
+                <span className="text-gray-700">
+                  {item.menu_name} x {item.quantity}
+                </span>
+                <span className="text-gray-600">
+                  {(item.price * item.quantity).toLocaleString()}원
+                </span>
+              </div>
+            ))}
+            <div className="flex justify-between text-sm font-semibold pt-1 border-t">
+              <span>합계</span>
+              <span>
+                {queue.items
+                  .reduce((sum, item) => sum + item.price * item.quantity, 0)
+                  .toLocaleString()}
+                원
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 액션 버튼 */}
       <div className="flex gap-2">

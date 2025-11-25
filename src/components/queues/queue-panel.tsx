@@ -2,21 +2,34 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Queue, FilteredQueues, QueueNotification } from '@/types/queue';
+import { Queue, FilteredQueues, QueueNotification, QueueWithItems, QueueItemInsert } from '@/types/queue';
 import { QueueCard } from './queue-card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Minus, X } from 'lucide-react';
+import { Tables } from '@/types/database.generated';
+
+type Menu = Tables<'menus'>;
 
 interface QueuePanelProps {
   storeId: number;
 }
 
+interface SelectedMenuItem {
+  menu: Menu;
+  quantity: number;
+}
+
 export function QueuePanel({ storeId }: QueuePanelProps) {
   const { toast } = useToast();
-  const [queues, setQueues] = useState<Queue[]>([]);
+  const [queues, setQueues] = useState<QueueWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [menus, setMenus] = useState<Menu[]>([]);
+  const [isMenuDialogOpen, setIsMenuDialogOpen] = useState(false);
+  const [selectedMenuItems, setSelectedMenuItems] = useState<SelectedMenuItem[]>([]);
 
   type NotificationStatus = 'success' | 'failure';
 
@@ -217,17 +230,36 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     ]
   );
 
-  // Queue 데이터 로드
+  // Queue 데이터 로드 (주문 항목 포함)
   const loadQueues = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data: queuesData, error: queuesError } = await supabase
         .from('queues')
         .select('*')
         .eq('store_id', storeId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setQueues(data || []);
+      if (queuesError) throw queuesError;
+
+      // 각 queue에 대한 items를 불러오기
+      const queuesWithItems: QueueWithItems[] = await Promise.all(
+        (queuesData || []).map(async (queue) => {
+          const { data: items, error: itemsError } = await supabase
+            .from('queue_items')
+            .select('*')
+            .eq('queue_id', queue.queue_id)
+            .order('created_at', { ascending: true });
+
+          if (itemsError) {
+            console.error('주문 항목 로드 실패:', itemsError);
+            return { ...queue, items: [] };
+          }
+
+          return { ...queue, items: items || [] };
+        })
+      );
+
+      setQueues(queuesWithItems);
     } catch (error) {
       console.error('주문 목록 로드 실패:', error);
       toast({
@@ -240,10 +272,28 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     }
   }, [storeId, toast]);
 
+  // 메뉴 데이터 로드
+  const loadMenus = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('menus')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setMenus(data || []);
+    } catch (error) {
+      console.error('메뉴 로드 실패:', error);
+    }
+  }, [storeId]);
+
   // 초기 로드
   useEffect(() => {
     loadQueues();
-  }, [loadQueues]);
+    loadMenus();
+  }, [loadQueues, loadMenus]);
 
   // 실시간 구독
   useEffect(() => {
@@ -257,13 +307,23 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
           table: 'queues',
           filter: `store_id=eq.${storeId}`,
         },
-        (payload) => {
+        async (payload) => {
           if (payload.eventType === 'INSERT') {
-            setQueues((prev) => [payload.new as Queue, ...prev]);
+            const newQueue = payload.new as Queue;
+            // 새 queue의 items도 불러오기
+            const { data: items } = await supabase
+              .from('queue_items')
+              .select('*')
+              .eq('queue_id', newQueue.queue_id)
+              .order('created_at', { ascending: true });
+            
+            setQueues((prev) => [{ ...newQueue, items: items || [] }, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
             setQueues((prev) =>
               prev.map((q) =>
-                q.queue_id === (payload.new as Queue).queue_id ? (payload.new as Queue) : q
+                q.queue_id === (payload.new as Queue).queue_id 
+                  ? { ...(payload.new as Queue), items: q.items } 
+                  : q
               )
             );
           } else if (payload.eventType === 'DELETE') {
@@ -324,7 +384,55 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     return () => clearInterval(interval);
   }, [storeId]);
 
-  // 새 주문 생성
+  // 메뉴 선택 다이얼로그 열기
+  const handleOpenMenuDialog = () => {
+    if (menus.length === 0) {
+      toast({
+        title: '알림',
+        description: '등록된 메뉴가 없습니다. 먼저 메뉴를 등록해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSelectedMenuItems([]);
+    setIsMenuDialogOpen(true);
+  };
+
+  // 메뉴 추가
+  const handleAddMenuItem = (menu: Menu) => {
+    const existing = selectedMenuItems.find((item) => item.menu.menu_id === menu.menu_id);
+    if (existing) {
+      setSelectedMenuItems(
+        selectedMenuItems.map((item) =>
+          item.menu.menu_id === menu.menu_id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
+    } else {
+      setSelectedMenuItems([...selectedMenuItems, { menu, quantity: 1 }]);
+    }
+  };
+
+  // 메뉴 수량 변경
+  const handleChangeQuantity = (menuId: number, quantity: number) => {
+    if (quantity <= 0) {
+      setSelectedMenuItems(selectedMenuItems.filter((item) => item.menu.menu_id !== menuId));
+    } else {
+      setSelectedMenuItems(
+        selectedMenuItems.map((item) =>
+          item.menu.menu_id === menuId ? { ...item, quantity } : item
+        )
+      );
+    }
+  };
+
+  // 메뉴 항목 제거
+  const handleRemoveMenuItem = (menuId: number) => {
+    setSelectedMenuItems(selectedMenuItems.filter((item) => item.menu.menu_id !== menuId));
+  };
+
+  // 새 주문 생성 (메뉴 포함)
   const handleGenerateQueue = async () => {
     try {
       setActionLoading(true);
@@ -368,13 +476,15 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
       }
 
       // 새 주문 생성
-      const { error } = await supabase
+      const { data: newQueue, error } = await supabase
         .from('queues')
         .insert({
           store_id: storeId,
           queue_number: queueNumber,
           status: 0,
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         // 중복 시 재시도 (드물지만 동시 요청의 경우)
@@ -384,6 +494,32 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
         throw error;
       }
 
+      // 주문 항목 추가
+      if (selectedMenuItems.length > 0 && newQueue) {
+        const queueItems: QueueItemInsert[] = selectedMenuItems.map((item) => ({
+          queue_id: newQueue.queue_id,
+          menu_id: item.menu.menu_id,
+          menu_name: item.menu.name || '',
+          quantity: item.quantity,
+          price: item.menu.price || 0,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('queue_items')
+          .insert(queueItems);
+
+        if (itemsError) {
+          console.error('주문 항목 추가 실패:', JSON.stringify(itemsError, null, 2));
+          console.error('실패한 데이터:', JSON.stringify(queueItems, null, 2));
+          // 주문은 생성되었으나 항목 추가 실패 시 주문 삭제
+          await supabase.from('queues').delete().eq('queue_id', newQueue.queue_id);
+          throw new Error(`주문 항목 추가에 실패했습니다: ${itemsError.message || JSON.stringify(itemsError)}`);
+        }
+      }
+
+      setIsMenuDialogOpen(false);
+      setSelectedMenuItems([]);
+      
       toast({
         title: '성공',
         description: `주문번호 #${String(queueNumber).padStart(3, '0')}가 생성되었습니다.`,
@@ -511,13 +647,19 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
     );
   }
 
+  // 총 가격 계산
+  const totalPrice = selectedMenuItems.reduce(
+    (sum, item) => sum + (item.menu.price || 0) * item.quantity,
+    0
+  );
+
   return (
     <div className="h-full flex flex-col">
       {/* 헤더 */}
       <div className="mb-4">
         <h2 className="text-xl font-bold mb-2">주문 관리</h2>
         <Button
-          onClick={handleGenerateQueue}
+          onClick={handleOpenMenuDialog}
           disabled={actionLoading}
           className="w-full"
         >
@@ -529,6 +671,125 @@ export function QueuePanel({ storeId }: QueuePanelProps) {
           새 주문번호 생성
         </Button>
       </div>
+
+      {/* 메뉴 선택 다이얼로그 */}
+      <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>주문 메뉴 선택</DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto space-y-4 py-4">
+            {/* 선택된 메뉴 목록 */}
+            {selectedMenuItems.length > 0 && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-semibold mb-3">선택된 메뉴</h3>
+                <div className="space-y-2">
+                  {selectedMenuItems.map((item) => (
+                    <div
+                      key={item.menu.menu_id}
+                      className="flex items-center justify-between bg-white p-3 rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{item.menu.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {(item.menu.price || 0).toLocaleString()}원
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleChangeQuantity(item.menu.menu_id, item.quantity - 1)
+                          }
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            handleChangeQuantity(
+                              item.menu.menu_id,
+                              parseInt(e.target.value) || 0
+                            )
+                          }
+                          className="w-16 text-center"
+                          min="1"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleChangeQuantity(item.menu.menu_id, item.quantity + 1)
+                          }
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveMenuItem(item.menu.menu_id)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="ml-4 font-semibold">
+                        {((item.menu.price || 0) * item.quantity).toLocaleString()}원
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-3 flex justify-between items-center font-bold text-lg">
+                    <span>총 금액</span>
+                    <span>{totalPrice.toLocaleString()}원</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 메뉴 목록 */}
+            <div>
+              <h3 className="font-semibold mb-3">메뉴 선택</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {menus.map((menu) => (
+                  <button
+                    key={menu.menu_id}
+                    onClick={() => handleAddMenuItem(menu)}
+                    className="border rounded-lg p-3 text-left hover:border-purple-500 hover:bg-purple-50 transition-colors"
+                  >
+                    <p className="font-medium">{menu.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {(menu.price || 0).toLocaleString()}원
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsMenuDialogOpen(false);
+                setSelectedMenuItems([]);
+              }}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleGenerateQueue}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              완료
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 빈 상태 */}
       {queues.length === 0 && (
