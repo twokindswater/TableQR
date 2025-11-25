@@ -19,6 +19,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ImageCropDialogProps {
   open: boolean;
@@ -29,12 +32,14 @@ interface ImageCropDialogProps {
   cropShape?: 'rect' | 'round';
 }
 
+type ResizeMode = 'original' | 'custom';
+
 export function ImageCropDialog({
   open,
   imageSrc,
   onClose,
   onCropComplete,
-  aspectRatio = 1,
+  aspectRatio,
   cropShape = 'rect',
 }: ImageCropDialogProps) {
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -42,6 +47,11 @@ export function ImageCropDialog({
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number }>();
+  const [resizeMode, setResizeMode] = useState<ResizeMode>('original');
+  const [customWidth, setCustomWidth] = useState<number>(0);
+  const [customHeight, setCustomHeight] = useState<number>(0);
+  const [croppedNaturalSize, setCroppedNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const [maintainAspectRatio, setMaintainAspectRatio] = useState<boolean>(false);
 
   // 다이얼로그가 열릴 때마다 초기화
   useEffect(() => {
@@ -49,6 +59,11 @@ export function ImageCropDialog({
       setImageSize(undefined);
       setCrop(undefined);
       setCompletedCrop(null);
+      setResizeMode('original');
+      setCustomWidth(0);
+      setCustomHeight(0);
+      setCroppedNaturalSize(null);
+      setMaintainAspectRatio(false);
     }
   }, [open]);
 
@@ -87,24 +102,43 @@ export function ImageCropDialog({
 
     setImageSize({ width: displayWidth, height: displayHeight });
 
-    const initialPercentCrop = centerCrop(
-      makeAspectCrop(
-        { unit: '%', width: 80 },
-        aspectRatio,
+    // 비율이 지정된 경우에만 비율 고정 크롭, 그렇지 않으면 자유 크롭
+    let initialPixelCrop: PixelCrop;
+    
+    if (aspectRatio) {
+      const initialPercentCrop = centerCrop(
+        makeAspectCrop(
+          { unit: '%', width: 80 },
+          aspectRatio,
+          naturalWidth,
+          naturalHeight
+        ),
         naturalWidth,
         naturalHeight
-      ),
-      naturalWidth,
-      naturalHeight
-    );
+      );
 
-    const initialPixelCrop: PixelCrop = {
-      unit: 'px',
-      x: Math.round((displayWidth * initialPercentCrop.x) / 100),
-      y: Math.round((displayHeight * initialPercentCrop.y) / 100),
-      width: Math.round((displayWidth * initialPercentCrop.width) / 100),
-      height: Math.round((displayHeight * initialPercentCrop.height) / 100),
-    };
+      initialPixelCrop = {
+        unit: 'px',
+        x: Math.round((displayWidth * initialPercentCrop.x) / 100),
+        y: Math.round((displayHeight * initialPercentCrop.y) / 100),
+        width: Math.round((displayWidth * initialPercentCrop.width) / 100),
+        height: Math.round((displayHeight * initialPercentCrop.height) / 100),
+      };
+    } else {
+      // 비율 고정 없이 80% 크기로 초기 크롭 영역 생성
+      const cropWidth = Math.round(displayWidth * 0.8);
+      const cropHeight = Math.round(displayHeight * 0.8);
+      const cropX = Math.round((displayWidth - cropWidth) / 2);
+      const cropY = Math.round((displayHeight - cropHeight) / 2);
+
+      initialPixelCrop = {
+        unit: 'px',
+        x: cropX,
+        y: cropY,
+        width: cropWidth,
+        height: cropHeight,
+      };
+    }
 
     const clamped = clampCrop(initialPixelCrop);
     setCrop(clamped);
@@ -123,22 +157,38 @@ export function ImageCropDialog({
       const scaleX = image.naturalWidth / image.width;
       const scaleY = image.naturalHeight / image.height;
 
-      canvas.width = Math.floor(completedCrop.width * scaleX);
-      canvas.height = Math.floor(completedCrop.height * scaleY);
+      // 원본 크롭된 이미지 크기 계산
+      const croppedWidth = Math.floor(completedCrop.width * scaleX);
+      const croppedHeight = Math.floor(completedCrop.height * scaleY);
+
+      // 크기 조절 로직
+      let finalWidth = croppedWidth;
+      let finalHeight = croppedHeight;
+
+      if (resizeMode === 'custom' && customWidth > 0 && customHeight > 0) {
+        // 사용자가 지정한 가로/세로 크기 사용
+        finalWidth = customWidth;
+        finalHeight = customHeight;
+      }
+      // resizeMode === 'original'인 경우 원본 크기 유지
+
+      canvas.width = finalWidth;
+      canvas.height = finalHeight;
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
+      // 크롭된 이미지를 캔버스에 그리기 (리사이즈 포함)
       ctx.drawImage(
         image,
         Math.floor(completedCrop.x * scaleX),
         Math.floor(completedCrop.y * scaleY),
-        Math.floor(completedCrop.width * scaleX),
-        Math.floor(completedCrop.height * scaleY),
+        croppedWidth,
+        croppedHeight,
         0,
         0,
-        Math.floor(completedCrop.width * scaleX),
-        Math.floor(completedCrop.height * scaleY)
+        finalWidth,
+        finalHeight
       );
 
       canvas.toBlob((blob) => {
@@ -146,19 +196,49 @@ export function ImageCropDialog({
           onCropComplete(blob);
           onClose();
         }
-      }, 'image/jpeg');
+      }, 'image/jpeg', 0.92);
     } catch (error) {
-      console.error('이미지 크롭 실패:', error);
+      console.error('Failed to crop image:', error);
     }
   };
+
+  // 크롭 영역이 변경될 때 원본 크기 저장 및 커스텀 크기 초기화
+  useEffect(() => {
+    if (completedCrop && imgRef.current) {
+      const image = imgRef.current;
+      const scaleX = image.naturalWidth / image.width;
+      const scaleY = image.naturalHeight / image.height;
+      const naturalWidth = Math.floor(completedCrop.width * scaleX);
+      const naturalHeight = Math.floor(completedCrop.height * scaleY);
+      
+      setCroppedNaturalSize({
+        width: naturalWidth,
+        height: naturalHeight,
+      });
+      
+      // 커스텀 크기를 원본 크기로 초기화
+      if (resizeMode === 'custom' && (customWidth === 0 || customHeight === 0)) {
+        setCustomWidth(naturalWidth);
+        setCustomHeight(naturalHeight);
+      }
+    }
+  }, [completedCrop, resizeMode, customWidth, customHeight]);
+
+  // 비율 유지 옵션이 변경될 때 높이 자동 조절
+  useEffect(() => {
+    if (maintainAspectRatio && croppedNaturalSize && customWidth > 0) {
+      const ratio = croppedNaturalSize.height / croppedNaturalSize.width;
+      setCustomHeight(Math.round(customWidth * ratio));
+    }
+  }, [maintainAspectRatio, customWidth, croppedNaturalSize]);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>이미지 크롭</DialogTitle>
+          <DialogTitle>Crop & Resize Image</DialogTitle>
           <DialogDescription>
-            이미지를 드래그하거나 줌을 조절하여 원하는 영역을 선택하세요.
+            Drag or zoom to select the desired area, then adjust the final image size.
           </DialogDescription>
         </DialogHeader>
         <div
@@ -180,7 +260,7 @@ export function ImageCropDialog({
               setCrop((prev) => (prev && areCropsEqual(prev, clamped) ? prev : clamped));
             }}
             onComplete={(nextCrop) => setCompletedCrop(clampCrop(nextCrop))}
-            aspect={aspectRatio}
+            aspect={aspectRatio || undefined}
             keepSelection
             locked={false}
             ruleOfThirds
@@ -201,11 +281,120 @@ export function ImageCropDialog({
             />
           </ReactCrop>
         </div>
+
+        {/* 크기 조절 옵션 */}
+        {completedCrop && croppedNaturalSize && (
+          <div className="space-y-4 py-4 border-t">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Resize Options</Label>
+              <div className="text-xs text-gray-500">
+                Cropped size: {croppedNaturalSize.width} × {croppedNaturalSize.height}px
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="resize-mode" className="text-sm">
+                Resize Mode
+              </Label>
+              <Select value={resizeMode} onValueChange={(value) => setResizeMode(value as ResizeMode)}>
+                <SelectTrigger id="resize-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="original">Original Size</SelectItem>
+                  <SelectItem value="custom">Custom Size</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {resizeMode === 'custom' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="maintain-ratio"
+                    checked={maintainAspectRatio}
+                    onChange={(e) => setMaintainAspectRatio(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <Label htmlFor="maintain-ratio" className="text-sm cursor-pointer">
+                    Maintain aspect ratio
+                  </Label>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-width" className="text-sm">
+                      Width (px)
+                    </Label>
+                    <Input
+                      id="custom-width"
+                      type="number"
+                      min="1"
+                      max="5000"
+                      value={customWidth || ''}
+                      onChange={(e) => {
+                        const width = parseInt(e.target.value) || 0;
+                        setCustomWidth(width);
+                        if (maintainAspectRatio && croppedNaturalSize) {
+                          const ratio = croppedNaturalSize.height / croppedNaturalSize.width;
+                          setCustomHeight(Math.round(width * ratio));
+                        }
+                      }}
+                      placeholder="Width"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-height" className="text-sm">
+                      Height (px)
+                    </Label>
+                    <Input
+                      id="custom-height"
+                      type="number"
+                      min="1"
+                      max="5000"
+                      value={customHeight || ''}
+                      onChange={(e) => {
+                        const height = parseInt(e.target.value) || 0;
+                        setCustomHeight(height);
+                        if (maintainAspectRatio && croppedNaturalSize) {
+                          const ratio = croppedNaturalSize.width / croppedNaturalSize.height;
+                          setCustomWidth(Math.round(height * ratio));
+                        }
+                      }}
+                      placeholder="Height"
+                    />
+                  </div>
+                </div>
+
+                {customWidth > 0 && customHeight > 0 && (
+                  <div className="text-xs text-gray-500">
+                    Final size: {customWidth} × {customHeight}px
+                    {maintainAspectRatio && (
+                      <span className="ml-2 text-blue-600">(Aspect ratio maintained)</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {resizeMode === 'original' && (
+              <div className="text-xs text-gray-500">
+                Image will be saved at original cropped size: {croppedNaturalSize.width} ×{' '}
+                {croppedNaturalSize.height}px
+              </div>
+            )}
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            취소
+            Cancel
           </Button>
-          <Button onClick={createCroppedImage}>완료</Button>
+          <Button onClick={createCroppedImage} disabled={!completedCrop}>
+            Complete
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

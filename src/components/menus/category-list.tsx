@@ -30,22 +30,22 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', description: '' });
 
-  // 드래그 앤 드롭을 위한 센서 설정
+  // Sensor configuration for drag and drop
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8, // 8px 이상 움직여야 드래그 시작
+        distance: 8, // Must move 8px to start drag
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // 200ms 이상 터치해야 드래그 시작
-        tolerance: 5, // 5px 이상 움직여야 드래그 시작
+        delay: 200, // Must touch for 200ms to start drag
+        tolerance: 5, // Must move 5px to start drag
       },
     })
   );
 
-  // 순서 변경 처리
+  // Handle order change
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
@@ -70,7 +70,7 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
       setLoading(true);
       const newCategories = arrayMove(categories, oldIndex, newIndex);
       
-      // 순서 업데이트 - 전체 객체를 사용하되 display_order만 변경
+      // Update order - use full object but only change display_order
       const updates = newCategories.map((category, index) => ({
         ...category,
         display_order: index,
@@ -89,14 +89,14 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
 
       onCategoriesChange(newCategories);
       toast({
-        title: '성공',
-        description: '카테고리 순서가 변경되었습니다.',
+        title: 'Success',
+        description: 'Category order has been changed.',
       });
     } catch (error) {
-      console.error('카테고리 순서 변경 실패:', error);
+      console.error('Failed to change category order:', error);
       toast({
-        title: '오류',
-        description: '카테고리 순서 변경에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to change category order.',
         variant: 'destructive',
       });
     } finally {
@@ -124,14 +124,14 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
       setNewCategory({ name: '', description: '' });
       setIsAddDialogOpen(false);
       toast({
-        title: '성공',
-        description: '새로운 카테고리가 추가되었습니다.',
+        title: 'Success',
+        description: 'New category has been added.',
       });
     } catch (error) {
-      console.error('카테고리 추가 실패:', error);
+      console.error('Failed to add category:', error);
       toast({
-        title: '오류',
-        description: '카테고리 추가에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to add category.',
         variant: 'destructive',
       });
     } finally {
@@ -164,14 +164,14 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
       setNewCategory({ name: '', description: '' });
       setIsEditDialogOpen(false);
       toast({
-        title: '성공',
-        description: '카테고리가 수정되었습니다.',
+        title: 'Success',
+        description: 'Category has been updated.',
       });
     } catch (error) {
-      console.error('카테고리 수정 실패:', error);
+      console.error('Failed to update category:', error);
       toast({
-        title: '오류',
-        description: '카테고리 수정에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to update category.',
         variant: 'destructive',
       });
     } finally {
@@ -193,14 +193,14 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
         categories.filter((cat) => cat.category_id !== categoryId)
       );
       toast({
-        title: '성공',
-        description: '카테고리가 삭제되었습니다.',
+        title: 'Success',
+        description: 'Category has been deleted.',
       });
     } catch (error) {
-      console.error('카테고리 삭제 실패:', error);
+      console.error('Failed to delete category:', error);
       toast({
-        title: '오류',
-        description: '카테고리 삭제에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to delete category.',
         variant: 'destructive',
       });
     } finally {
@@ -208,7 +208,7 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
     }
   };
 
-  // 카테고리 아이템 컴포넌트
+  // Category item component
   const CategoryItem = ({ category }: { category: Category }) => {
     const {
       attributes,
@@ -264,18 +264,18 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>카테고리 삭제</AlertDialogTitle>
+              <AlertDialogTitle>Delete Category</AlertDialogTitle>
               <AlertDialogDescription>
-                정말로 이 카테고리를 삭제하시겠습니까?
-                이 작업은 되돌릴 수 없으며, 카테고리에 속한 모든 메뉴가 미분류 상태가 됩니다.
+                Are you sure you want to delete this category?
+                This action cannot be undone, and all menus in this category will become uncategorized.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => handleDeleteCategory(category.category_id)}
               >
-                삭제
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -286,7 +286,7 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
 
   return (
     <div className="space-y-4">
-      {/* 카테고리 목록 */}
+      {/* Category list */}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext items={categories.map(cat => cat.category_id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
@@ -297,7 +297,7 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
         </SortableContext>
       </DndContext>
 
-      {/* 카테고리 추가 버튼 */}
+      {/* Add category button */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogTrigger asChild>
           <Button
@@ -308,19 +308,19 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              '+ 카테고리 추가'
+              '+ Add Category'
             )}
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>새 카테고리 추가</DialogTitle>
-            <p className="text-sm text-gray-500">새로운 카테고리를 추가하세요.</p>
+            <DialogTitle>Add New Category</DialogTitle>
+            <p className="text-sm text-gray-500">Add a new category.</p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-medium">
-                카테고리명
+                Category Name
               </label>
               <Input
                 id="name"
@@ -328,12 +328,12 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                 onChange={(e) =>
                   setNewCategory({ ...newCategory, name: e.target.value })
                 }
-                placeholder="예: 커피, 디저트"
+                placeholder="e.g., Coffee, Desserts"
               />
             </div>
             <div className="space-y-2">
               <label htmlFor="description" className="text-sm font-medium">
-                설명
+                Description
               </label>
               <Textarea
                 id="description"
@@ -341,36 +341,36 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                 onChange={(e) =>
                   setNewCategory({ ...newCategory, description: e.target.value })
                 }
-                placeholder="카테고리에 대한 설명을 입력하세요"
+                placeholder="Enter a description for the category"
               />
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              취소
+              Cancel
             </Button>
             <Button onClick={handleAddCategory} disabled={loading}>
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                '추가'
+                'Add'
               )}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 카테고리 수정 다이얼로그 */}
+      {/* Edit category dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>카테고리 수정</DialogTitle>
-            <p className="text-sm text-gray-500">카테고리 정보를 수정하세요.</p>
+            <DialogTitle>Edit Category</DialogTitle>
+            <p className="text-sm text-gray-500">Update category information.</p>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label htmlFor="edit-name" className="text-sm font-medium">
-                카테고리명
+                Category Name
               </label>
               <Input
                 id="edit-name"
@@ -378,12 +378,12 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                 onChange={(e) =>
                   setNewCategory({ ...newCategory, name: e.target.value })
                 }
-                placeholder="예: 커피, 디저트"
+                placeholder="e.g., Coffee, Desserts"
               />
             </div>
             <div className="space-y-2">
               <label htmlFor="edit-description" className="text-sm font-medium">
-                설명
+                Description
               </label>
               <Textarea
                 id="edit-description"
@@ -391,19 +391,19 @@ export function CategoryList({ storeId, categories, onCategoriesChange }: Catego
                 onChange={(e) =>
                   setNewCategory({ ...newCategory, description: e.target.value })
                 }
-                placeholder="카테고리에 대한 설명을 입력하세요"
+                placeholder="Enter a description for the category"
               />
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              취소
+              Cancel
             </Button>
             <Button onClick={handleEditCategory} disabled={loading}>
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                '수정'
+                'Update'
               )}
             </Button>
           </div>

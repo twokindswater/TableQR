@@ -63,21 +63,21 @@ export interface QueueStatusInfo {
 // Queue 상태별 정보 맵
 export const QUEUE_STATUS_MAP: Record<QueueStatus, QueueStatusInfo> = {
   0: {
-    label: '대기 중',
+    label: 'Waiting',
     color: 'text-gray-900',
     bgColor: 'bg-white',
     borderColor: 'border-gray-300',
     icon: '🔔',
   },
   1: {
-    label: '준비 완료',
+    label: 'Ready',
     color: 'text-gray-900',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-500',
     icon: '✅',
   },
   2: {
-    label: '완료',
+    label: 'Completed',
     color: 'text-gray-900',
     bgColor: 'bg-red-50',
     borderColor: 'border-red-500',

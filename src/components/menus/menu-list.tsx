@@ -50,23 +50,23 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
   const [cropImageSrc, setCropImageSrc] = useState('');
   const [cropTarget, setCropTarget] = useState<'new' | 'edit'>('new');
 
-  // 드래그 앤 드롭을 위한 센서 설정
+  // Sensor configuration for drag and drop
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 10, // 10px 이상 움직여야 드래그 시작
-        delay: 250, // 250ms 이상 눌러야 드래그 시작
+        distance: 10, // Must move 10px to start drag
+        delay: 250, // Must press for 250ms to start drag
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250, // 250ms 이상 터치해야 드래그 시작
-        tolerance: 10, // 10px 이상 움직여야 드래그 시작
+        delay: 250, // Must touch for 250ms to start drag
+        tolerance: 10, // Must move 10px to start drag
       },
     })
   );
 
-  // 순서 변경 처리
+  // Handle order change
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
@@ -85,7 +85,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       setLoading(true);
       const newMenus = arrayMove(menus, oldIndex, newIndex);
       
-      // 순서 업데이트
+      // Update order
       const updates = newMenus.map((menu, index) => ({
         menu_id: menu.menu_id,
         display_order: index,
@@ -99,14 +99,14 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
 
       onMenusChange(newMenus);
       toast({
-        title: '성공',
-        description: '메뉴 순서가 변경되었습니다.',
+        title: 'Success',
+        description: 'Menu order has been changed.',
       });
     } catch (error) {
-      console.error('메뉴 순서 변경 실패:', error);
+      console.error('Failed to change menu order:', error);
       toast({
-        title: '오류',
-        description: '메뉴 순서 변경에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to change menu order.',
         variant: 'destructive',
       });
     } finally {
@@ -143,14 +143,14 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       });
       setIsAddDialogOpen(false);
       toast({
-        title: '성공',
-        description: '새로운 메뉴가 추가되었습니다.',
+        title: 'Success',
+        description: 'New menu has been added.',
       });
     } catch (error) {
-      console.error('메뉴 추가 실패:', error);
+      console.error('Failed to add menu:', error);
       toast({
-        title: '오류',
-        description: '메뉴 추가에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to add menu.',
         variant: 'destructive',
       });
     } finally {
@@ -192,14 +192,14 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       });
       setIsEditDialogOpen(false);
       toast({
-        title: '성공',
-        description: '메뉴가 수정되었습니다.',
+        title: 'Success',
+        description: 'Menu has been updated.',
       });
     } catch (error) {
-      console.error('메뉴 수정 실패:', error);
+      console.error('Failed to update menu:', error);
       toast({
-        title: '오류',
-        description: '메뉴 수정에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to update menu.',
         variant: 'destructive',
       });
     } finally {
@@ -212,7 +212,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       setLoading(true);
       const menuToDelete = menus.find((menu) => menu.menu_id === menuId);
       
-      // 메뉴 삭제
+      // Delete menu
       const { error } = await supabase
         .from('menus')
         .delete()
@@ -220,21 +220,21 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
 
       if (error) throw error;
 
-      // 이미지가 있다면 삭제
+      // Delete image if exists
       if (menuToDelete?.image_url) {
         await deleteMenuImage(menuToDelete.image_url);
       }
 
       onMenusChange(menus.filter((menu) => menu.menu_id !== menuId));
       toast({
-        title: '성공',
-        description: '메뉴가 삭제되었습니다.',
+        title: 'Success',
+        description: 'Menu has been deleted.',
       });
     } catch (error) {
-      console.error('메뉴 삭제 실패:', error);
+      console.error('Failed to delete menu:', error);
       toast({
-        title: '오류',
-        description: '메뉴 삭제에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to delete menu.',
         variant: 'destructive',
       });
     } finally {
@@ -248,7 +248,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       const validation = validateImageFile(file);
       if (!validation.isValid) {
         toast({
-          title: '오류',
+          title: 'Error',
           description: validation.error,
           variant: 'destructive',
         });
@@ -262,7 +262,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         setCropDialogOpen(true);
       };
       reader.readAsDataURL(file);
-      // 파일 입력 초기화
+      // Reset file input
       e.target.value = '';
     }
   }, [toast]);
@@ -271,7 +271,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
     try {
       setLoading(true);
 
-      // Blob을 File로 변환
+      // Convert Blob to File
       const fileName = `menu-${Date.now()}.jpg`;
       const file = new File([croppedBlob], fileName, { type: 'image/jpeg' });
 
@@ -292,14 +292,14 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       }
 
       toast({
-        title: '업로드 성공',
-        description: '이미지가 성공적으로 업로드되었습니다.',
+        title: 'Upload Success',
+        description: 'Image has been uploaded successfully.',
       });
     } catch (error) {
-      console.error('이미지 업로드 실패:', error);
+      console.error('Failed to upload image:', error);
       toast({
-        title: '오류',
-        description: '이미지 업로드에 실패했습니다.',
+        title: 'Error',
+        description: 'Failed to upload image.',
         variant: 'destructive',
       });
     } finally {
@@ -326,14 +326,14 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         setLoading(true);
         await deleteMenuImage(targetUrl);
         toast({
-          title: '삭제 완료',
-          description: '이미지가 삭제되었습니다.',
+          title: 'Delete Complete',
+          description: 'Image has been deleted.',
         });
       } catch (error) {
-        console.error('이미지 삭제 실패:', error);
+        console.error('Failed to delete image:', error);
         toast({
-          title: '오류',
-          description: '이미지 삭제에 실패했습니다.',
+          title: 'Error',
+          description: 'Failed to delete image.',
           variant: 'destructive',
         });
       } finally {
@@ -353,18 +353,18 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
     <div className="space-y-4 py-4">
       <div className="space-y-2">
         <label htmlFor="name" className="text-sm font-medium">
-          메뉴명 *
+          Menu Name *
         </label>
         <Input
           id="name"
           value={newMenu.name}
           onChange={(e) => setNewMenu({ ...newMenu, name: e.target.value })}
-          placeholder="예: 아메리카노"
+          placeholder="e.g., Americano"
         />
       </div>
       <div className="space-y-2">
         <label htmlFor="category" className="text-sm font-medium">
-          카테고리
+          Category
         </label>
         <Select
           value={newMenu.category_id}
@@ -373,7 +373,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
           }
         >
           <SelectTrigger>
-            <SelectValue placeholder="카테고리 선택" />
+            <SelectValue placeholder="Select Category" />
           </SelectTrigger>
           <SelectContent>
             {categories.map((category) => (
@@ -389,7 +389,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       </div>
       <div className="space-y-2">
         <label htmlFor="price" className="text-sm font-medium">
-          가격 *
+          Price *
         </label>
         <Input
           id="price"
@@ -401,7 +401,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
       </div>
       <div className="space-y-2">
         <label htmlFor="description" className="text-sm font-medium">
-          설명
+          Description
         </label>
         <Textarea
           id="description"
@@ -409,17 +409,17 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
           onChange={(e) =>
             setNewMenu({ ...newMenu, description: e.target.value })
           }
-          placeholder="메뉴에 대한 설명을 입력하세요"
+          placeholder="Enter a description for the menu"
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">이미지</label>
+        <label className="text-sm font-medium">Image</label>
         <div className="mt-2">
           {newMenu.image_url ? (
             <div className="relative aspect-video w-full overflow-hidden rounded-lg">
               <Image
                 src={getImageVariant(newMenu.image_url, 'detail') ?? newMenu.image_url}
-                alt={newMenu.name || '메뉴 이미지'}
+                alt={newMenu.name || 'Menu image'}
                 fill
                 className="object-cover"
               />
@@ -432,7 +432,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                 }}
                 disabled={loading}
               >
-                삭제
+                Delete
               </Button>
             </div>
           ) : (
@@ -450,7 +450,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
               >
                 <ImageIcon className="w-8 h-8 text-gray-400" />
                 <span className="mt-2 text-sm text-gray-500">
-                  클릭하여 이미지 업로드
+                  Click to upload image
                 </span>
               </label>
             </div>
@@ -462,7 +462,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
 
   return (
     <div className="space-y-4">
-      {/* 메뉴 목록 - 드래그 앤 드롭 컨텍스트를 여기에만 적용 */}
+      {/* Menu list - apply drag and drop context only here */}
       <div>
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <SortableContext items={menus.map(menu => menu.menu_id)} strategy={rectSortingStrategy}>
@@ -474,7 +474,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                     <GripVertical className="w-5 h-5 text-white drop-shadow cursor-move opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   
-                  {/* 이미지 영역 */}
+                  {/* Image area */}
                   <div className="aspect-video bg-gray-100 relative">
                     {menu.image_url ? (
                       <Image
@@ -491,23 +491,23 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                       </div>
                     )}
                     
-                    {/* 가격 오버레이 */}
+                    {/* Price overlay */}
                     {menu.price && (
                       <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-sm font-medium">
-                        {menu.price.toLocaleString()}원
+                        ${menu.price.toLocaleString()}
                       </div>
                     )}
                   </div>
                   
-                  {/* 메뉴 정보 영역 */}
+                  {/* Menu info area */}
                   <div className="p-3">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <h3 className="font-semibold text-gray-900 text-sm leading-tight flex-1">
-                        {menu.name || '이름 없음'}
+                        {menu.name || 'Unnamed'}
                       </h3>
                       {menu.category_id && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary shrink-0">
-                          {categories.find(cat => cat.category_id === menu.category_id)?.name || '미분류'}
+                          {categories.find(cat => cat.category_id === menu.category_id)?.name || 'Uncategorized'}
                         </span>
                       )}
                     </div>
@@ -518,7 +518,7 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                     )}
                   </div>
                   
-                  {/* 편집 버튼들 */}
+                  {/* Edit buttons */}
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="secondary"
@@ -550,18 +550,18 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>메뉴 삭제</AlertDialogTitle>
+                          <AlertDialogTitle>Delete Menu</AlertDialogTitle>
                           <AlertDialogDescription>
-                            정말로 이 메뉴를 삭제하시겠습니까?
-                            이 작업은 되돌릴 수 없습니다.
+                            Are you sure you want to delete this menu?
+                            This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>취소</AlertDialogCancel>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleDeleteMenu(menu.menu_id)}
                           >
-                            삭제
+                            Delete
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -575,68 +575,67 @@ export function MenuList({ storeId, menus, categories, onMenusChange }: MenuList
         </DndContext>
       </div>
 
-      {/* 메뉴 추가 버튼 - 드래그 앤 드롭 컨텍스트 외부 */}
+      {/* Add menu button - outside drag and drop context */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" className="w-full" disabled={loading}>
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              '+ 메뉴 추가'
+              '+ Add Menu'
             )}
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>새 메뉴 추가</DialogTitle>
-            <p className="text-sm text-gray-500">새로운 메뉴를 추가하세요.</p>
+            <DialogTitle>Add New Menu</DialogTitle>
+            <p className="text-sm text-gray-500">Add a new menu.</p>
           </DialogHeader>
           {MenuForm}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              취소
+              Cancel
             </Button>
             <Button onClick={handleAddMenu} disabled={loading}>
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                '추가'
+                'Add'
               )}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 메뉴 수정 다이얼로그 - 드래그 앤 드롭 컨텍스트 외부 */}
+      {/* Edit menu dialog - outside drag and drop context */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>메뉴 수정</DialogTitle>
-            <p className="text-sm text-gray-500">메뉴 정보를 수정하세요.</p>
+            <DialogTitle>Edit Menu</DialogTitle>
+            <p className="text-sm text-gray-500">Update menu information.</p>
           </DialogHeader>
           {MenuForm}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              취소
+              Cancel
             </Button>
             <Button onClick={handleEditMenu} disabled={loading}>
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                '수정'
+                'Update'
               )}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 이미지 크롭 다이얼로그 */}
+      {/* Image crop dialog */}
       <ImageCropDialog
         open={cropDialogOpen}
         imageSrc={cropImageSrc}
         onClose={() => setCropDialogOpen(false)}
         onCropComplete={handleCropComplete}
-        aspectRatio={16 / 9}
         cropShape="rect"
       />
     </div>

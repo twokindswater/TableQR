@@ -18,7 +18,7 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
   const [waitingTime, setWaitingTime] = useState('');
   const statusInfo = QUEUE_STATUS_MAP[queue.status as 0 | 1 | 2];
 
-  // 대기 시간 계산
+  // Calculate waiting time
   useEffect(() => {
     const updateWaitingTime = () => {
       const now = new Date();
@@ -30,9 +30,9 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
       const seconds = diff % 60;
       
       if (hours > 0) {
-        setWaitingTime(`${hours}시간 ${minutes}분`);
+        setWaitingTime(`${hours}h ${minutes}m`);
       } else {
-        setWaitingTime(`${minutes}분 ${seconds}초`);
+        setWaitingTime(`${minutes}m ${seconds}s`);
       }
     };
 
@@ -42,7 +42,7 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
     return () => clearInterval(interval);
   }, [queue.created_at]);
 
-  // 자동 삭제까지 남은 시간 계산 (완료 상태일 때)
+  // Calculate time until auto-delete (when completed)
   const [autoDeleteTime, setAutoDeleteTime] = useState('');
   
   useEffect(() => {
@@ -54,21 +54,21 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
         const diff = Math.floor((oneHourLater.getTime() - now.getTime()) / 1000);
         
         if (diff <= 0) {
-          setAutoDeleteTime('곧 삭제됩니다');
+          setAutoDeleteTime('Will be deleted soon');
         } else {
           const minutes = Math.floor(diff / 60);
-          setAutoDeleteTime(`${minutes}분 후 자동 삭제`);
+          setAutoDeleteTime(`Auto delete in ${minutes} minutes`);
         }
       };
 
       updateAutoDeleteTime();
-      const interval = setInterval(updateAutoDeleteTime, 60000); // 1분마다 업데이트
+      const interval = setInterval(updateAutoDeleteTime, 60000); // Update every minute
 
       return () => clearInterval(interval);
     }
   }, [queue.status, queue.completed_at]);
 
-  // 생성 시간 포맷
+  // Format creation time
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
@@ -76,7 +76,7 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
 
   return (
     <div className={`relative border-2 rounded-lg p-4 ${statusInfo.bgColor} ${statusInfo.borderColor} transition-all hover:shadow-md`}>
-      {/* 주문번호 */}
+      {/* Order number */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-2xl">{statusInfo.icon}</span>
@@ -89,29 +89,29 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
         </span>
       </div>
 
-      {/* 시간 정보 */}
+      {/* Time information */}
       <div className="space-y-1 mb-4 text-sm">
-        {/* 완료 상태가 아닐 때만 대기 시간 표시 */}
+        {/* Show waiting time only when not completed */}
         {queue.status !== 2 && (
           <div className="flex justify-between">
-            <span className="text-gray-600">대기 시간:</span>
+            <span className="text-gray-600">Waiting Time:</span>
             <span className="font-semibold">{waitingTime}</span>
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-gray-600">생성:</span>
+          <span className="text-gray-600">Created:</span>
           <span className="text-gray-500">{formatTime(queue.created_at)}</span>
         </div>
         {queue.status === 1 && queue.called_at && (
           <div className="flex justify-between">
-            <span className="text-gray-600">준비:</span>
+            <span className="text-gray-600">Ready:</span>
             <span className="text-gray-500">{formatTime(queue.called_at)}</span>
           </div>
         )}
         {queue.status === 2 && queue.completed_at && (
           <>
             <div className="flex justify-between">
-              <span className="text-gray-600">완료:</span>
+              <span className="text-gray-600">Completed:</span>
               <span className="text-gray-500">{formatTime(queue.completed_at)}</span>
             </div>
             <div className="flex justify-between text-red-600 font-semibold mt-2">
@@ -122,10 +122,10 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
         )}
       </div>
 
-      {/* 주문 항목 */}
+      {/* Order items */}
       {queue.items && queue.items.length > 0 && (
         <div className="mb-4 border-t pt-3">
-          <p className="text-xs text-gray-600 font-semibold mb-2">주문 내역</p>
+          <p className="text-xs text-gray-600 font-semibold mb-2">Order Items</p>
           <div className="space-y-1">
             {queue.items.map((item) => (
               <div key={item.queue_item_id} className="flex justify-between text-sm">
@@ -133,24 +133,23 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
                   {item.menu_name} x {item.quantity}
                 </span>
                 <span className="text-gray-600">
-                  {(item.price * item.quantity).toLocaleString()}원
+                  ${(item.price * item.quantity).toLocaleString()}
                 </span>
               </div>
             ))}
             <div className="flex justify-between text-sm font-semibold pt-1 border-t">
-              <span>합계</span>
+              <span>Total</span>
               <span>
-                {queue.items
+                ${queue.items
                   .reduce((sum, item) => sum + item.price * item.quantity, 0)
                   .toLocaleString()}
-                원
               </span>
             </div>
           </div>
         </div>
       )}
 
-      {/* 액션 버튼 */}
+      {/* Action buttons */}
       <div className="flex gap-2">
         {queue.status === 0 && (
           <>
@@ -160,7 +159,7 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
               size="sm"
               className="flex-1"
             >
-              준비 완료
+              Mark Ready
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -175,16 +174,16 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>주문 삭제</AlertDialogTitle>
+                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
                   <AlertDialogDescription>
-                    #{String(queue.queue_number).padStart(3, '0')} 주문을 삭제하시겠습니까?
-                    이 작업은 되돌릴 수 없습니다.
+                    Are you sure you want to delete order #{String(queue.queue_number).padStart(3, '0')}?
+                    This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>취소</AlertDialogCancel>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={() => onDelete(queue.queue_id)}>
-                    삭제
+                    Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -199,7 +198,7 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
               size="sm"
               className="flex-1"
             >
-              완료
+              Mark Complete
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -214,15 +213,15 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>주문 삭제</AlertDialogTitle>
+                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
                   <AlertDialogDescription>
-                    #{String(queue.queue_number).padStart(3, '0')} 주문을 삭제하시겠습니까?
+                    Are you sure you want to delete order #{String(queue.queue_number).padStart(3, '0')}?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>취소</AlertDialogCancel>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={() => onDelete(queue.queue_id)}>
-                    삭제
+                    Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -239,20 +238,20 @@ function QueueCardComponent({ queue, onMarkReady, onMarkComplete, onDelete, load
                 className="w-full text-red-600 hover:text-red-700"
               >
                 <Trash className="w-4 h-4 mr-2" />
-                삭제
+                Delete
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>주문 삭제</AlertDialogTitle>
+                <AlertDialogTitle>Delete Order</AlertDialogTitle>
                 <AlertDialogDescription>
-                  #{String(queue.queue_number).padStart(3, '0')} 주문을 삭제하시겠습니까?
+                  Are you sure you want to delete order #${String(queue.queue_number).padStart(3, '0')}?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={() => onDelete(queue.queue_id)}>
-                  삭제
+                  Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
