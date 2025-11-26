@@ -55,6 +55,7 @@ const messages = {
       features: "기능",
       demo: "데모",
       pricing: "요금제",
+      contact: "문의",
     },
     hero: {
       badge: "QR 메뉴 SaaS · TableQR Standard",
@@ -177,6 +178,35 @@ const messages = {
           question: "스마트폰만으로 관리 가능한가요?",
           answer: "예, 관리자 페이지 역시 모바일 최적화가 되어 있어 스마트폰으로 메뉴와 대기를 제어할 수 있습니다.",
         },
+      },
+    },
+    contact: {
+      sectionLabel: "Contact",
+      title: "혹시 궁금한 점이 있으신가요?",
+      description:
+        "무엇이든 편하게 물어보세요.\n" +
+        "상담, 데모, 제휴 문의까지 모두 정성껏 답변드릴게요.",
+      card: {
+        subtitle: "메시지 보내기",
+        nameLabel: "이름",
+        namePlaceholder: "성함을 입력하세요",
+        emailLabel: "이메일",
+        emailPlaceholder: "name@email.com",
+        messageLabel: "메시지",
+        messagePlaceholder: "궁금한 점이나 제안을 자유롭게 작성하세요",
+        submit: "메시지 전송",
+      },
+      status: {
+        sending: "전송 중...",
+        success: "소중한 의견 감사합니다. 빠르게 답변드릴게요.",
+        error: "전송에 실패했습니다. 다시 시도해주세요.",
+      },
+      validation: {
+        nameRequired: "누구신지 알려주시면 더 빠르게 도와드릴 수 있어요.",
+        emailRequired: "답장을 드릴 이메일이 필요합니다.",
+        emailInvalid: "올바른 이메일 주소를 입력해주세요.",
+        messageRequired: "하고 싶은 이야기를 적어주세요.",
+        emptyAll: "모든 입력칸이 비어 있습니다. 메시지를 남겨주시면 도와드릴 수 있어요.",
       },
     },
     ready: {
