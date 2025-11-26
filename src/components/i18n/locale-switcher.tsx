@@ -1,11 +1,12 @@
 'use client'
 
-import { useTransition, useMemo } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { useLocale, useTranslations } from "next-intl"
 import { usePathname, useRouter } from "@/navigation"
 import { useSearchParams } from "@/navigation-client"
 import { locales, localeNames } from "@/i18n/config"
 import { cn } from "@/lib/utils"
+import { ChevronDown, Globe } from "lucide-react"
 
 type LocaleOption = (typeof locales)[number]
 
@@ -13,15 +14,22 @@ interface LocaleSwitcherProps {
   className?: string
   size?: "sm" | "md"
   hideLabel?: boolean
+  iconOnly?: boolean
 }
 
-export function LocaleSwitcher({ className, size = "md", hideLabel = false }: LocaleSwitcherProps) {
+export function LocaleSwitcher({
+  className,
+  size = "md",
+  hideLabel = false,
+  iconOnly = false,
+}: LocaleSwitcherProps) {
   const locale = useLocale() as LocaleOption
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const t = useTranslations("common")
   const [isPending, startTransition] = useTransition()
+  const [isOpen, setIsOpen] = useState(false)
 
   const normalizedPathname = useMemo(() => {
     if (!pathname) return "/"
@@ -32,6 +40,7 @@ export function LocaleSwitcher({ className, size = "md", hideLabel = false }: Lo
 
   const handleChange = (nextLocale: LocaleOption) => {
     if (nextLocale === locale) return
+    setIsOpen(false)
     startTransition(() => {
       const query = searchParams?.toString()
       const basePath = normalizedPathname || "/"
@@ -42,8 +51,12 @@ export function LocaleSwitcher({ className, size = "md", hideLabel = false }: Lo
 
   const sizeClasses =
     size === "sm"
-      ? "h-9 px-3 text-sm"
-      : "h-11 px-4 text-base"
+      ? iconOnly
+        ? "h-9 w-9"
+        : "h-9 px-3 text-sm"
+      : iconOnly
+        ? "h-11 w-11"
+        : "h-11 px-4 text-base"
 
   return (
     <label className={cn("flex flex-col gap-1 text-sm font-medium text-gray-600", className)}>
@@ -53,30 +66,62 @@ export function LocaleSwitcher({ className, size = "md", hideLabel = false }: Lo
         <span>{t("language.label")}</span>
       )}
 
-      <div
-        className={cn(
-          "relative min-w-[130px] overflow-hidden rounded-lg border border-gray-300 bg-white transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/40",
-        )}
-      >
-        <select
+      <div className="relative">
+        <button
+          type="button"
           className={cn(
-            "w-full appearance-none bg-transparent pl-4 pr-16 text-left text-gray-900 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60",
+            iconOnly
+              ? "inline-flex items-center justify-center rounded-full border border-gray-300 bg-white text-gray-900 transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+              : "flex w-full min-w-[130px] items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white text-gray-900 transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60",
             sizeClasses,
           )}
-          value={locale}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
           aria-label={t("language.label")}
-          onChange={(event) => handleChange(event.target.value as LocaleOption)}
+          onClick={() => setIsOpen((open) => !open)}
           disabled={isPending}
         >
-          {locales.map((option) => (
-            <option key={option} value={option}>
-              {localeNames[option]}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute inset-y-0 right-0 flex w-10 items-center justify-center border-l border-gray-200 bg-white text-gray-500">
-          ▾
-        </span>
+          {iconOnly ? (
+            <Globe className="h-4 w-4 text-gray-600" aria-hidden="true" />
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-gray-500" aria-hidden="true" />
+                <span className="text-sm font-medium">{localeNames[locale]}</span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-gray-500" aria-hidden="true" />
+            </>
+          )}
+        </button>
+
+        {isOpen ? (
+          <ul
+            role="listbox"
+            aria-label={t("language.label")}
+            className={cn(
+              "absolute z-20 mt-1 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg",
+              iconOnly ? "min-w-[130px]" : "w-full",
+            )}
+          >
+            {locales.map((option) => (
+              <li key={option}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={option === locale}
+                  className={cn(
+                    "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-gray-50",
+                    option === locale && "bg-gray-50 font-semibold text-primary",
+                  )}
+                  onClick={() => handleChange(option)}
+                  disabled={isPending}
+                >
+                  <span>{localeNames[option]}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
     </label>
   )

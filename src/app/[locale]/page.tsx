@@ -170,6 +170,9 @@ export default async function Home({ params: { locale } }: HomePageProps) {
             {isAuthenticated ? <LandingLogoutButton /> : null}
           </nav>
           <div className="flex items-center gap-3">
+            <div className="sm:hidden">
+              <LocaleSwitcher hideLabel size="sm" iconOnly />
+            </div>
             <div className="hidden sm:block">
               <LocaleSwitcher hideLabel size="sm" />
             </div>
@@ -187,9 +190,6 @@ export default async function Home({ params: { locale } }: HomePageProps) {
       <section className="border-b border-gray-100 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 py-16 md:flex-row md:py-24">
           <div className="flex-1 space-y-6 text-center md:text-left">
-            <div className="sm:hidden">
-              <LocaleSwitcher size="sm" />
-            </div>
             <p className="inline-flex rounded-full bg-primary-light px-4 py-1 text-sm font-semibold text-primary">
               {tLanding("hero.badge")}
             </p>
