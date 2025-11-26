@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { getTranslations } from "next-intl/server"
 
 import { PricingSection } from "@/components/landing/pricing-section"
+import { ContactSection } from "@/components/landing/contact-section"
 import { LandingLogoutButton } from "@/components/landing/landing-logout-button"
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher"
 import { authOptions } from "@/lib/auth"
@@ -90,7 +91,35 @@ export default async function Home({ params: { locale } }: HomePageProps) {
     { href: "#features", label: tLanding("nav.features") },
     { href: "#demo", label: tLanding("nav.demo") },
     { href: "#pricing", label: tLanding("nav.pricing") },
+    { href: "#contact", label: tLanding("nav.contact") },
   ]
+  const contactCopy = {
+    sectionLabel: tLanding("contact.sectionLabel"),
+    title: tLanding("contact.title"),
+    description: tLanding("contact.description"),
+    card: {
+      subtitle: tLanding("contact.card.subtitle"),
+      nameLabel: tLanding("contact.card.nameLabel"),
+      namePlaceholder: tLanding("contact.card.namePlaceholder"),
+      emailLabel: tLanding("contact.card.emailLabel"),
+      emailPlaceholder: tLanding("contact.card.emailPlaceholder"),
+      messageLabel: tLanding("contact.card.messageLabel"),
+      messagePlaceholder: tLanding("contact.card.messagePlaceholder"),
+      submit: tLanding("contact.card.submit"),
+    },
+    status: {
+      sending: tLanding("contact.status.sending"),
+      success: tLanding("contact.status.success"),
+      error: tLanding("contact.status.error"),
+    },
+    validation: {
+      nameRequired: tLanding("contact.validation.nameRequired"),
+      emailRequired: tLanding("contact.validation.emailRequired"),
+      emailInvalid: tLanding("contact.validation.emailInvalid"),
+      messageRequired: tLanding("contact.validation.messageRequired"),
+      emptyAll: tLanding("contact.validation.emptyAll"),
+    },
+  }
 
   const heroStatus: HeroStatusBlock | null = (() => {
     if (subscription.status === "trialing") {
@@ -351,6 +380,8 @@ export default async function Home({ params: { locale } }: HomePageProps) {
         </div>
       </section>
 
+      <ContactSection copy={contactCopy} locale={locale} />
+
       <section className="bg-gradient-to-br from-primary to-primary-dark text-white">
         <div className="mx-auto max-w-4xl px-6 py-16 text-center md:py-24">
           <p className="text-sm font-semibold uppercase tracking-wide text-white/80">{tLanding("ready.sectionLabel")}</p>
@@ -375,9 +406,9 @@ export default async function Home({ params: { locale } }: HomePageProps) {
             <Link href="/privacy" className="hover:text-white">
               {tLanding("footer.privacy")}
             </Link>
-            <Link href="/contact" className="hover:text-white">
+            <a href="#contact" className="hover:text-white">
               {tLanding("footer.contact")}
-            </Link>
+            </a>
           </div>
           <div className="flex items-center gap-4">
             <a href="https://instagram.com" className="hover:text-white">

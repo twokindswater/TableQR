@@ -55,6 +55,7 @@ const messages = {
       features: "Features",
       demo: "Demo",
       pricing: "Pricing",
+      contact: "Contact",
     },
     hero: {
       badge: "QR Menu SaaS · TableQR Standard",
@@ -177,6 +178,35 @@ const messages = {
           question: "Can I manage everything on my phone?",
           answer: "Yes. The dashboard is mobile-friendly, so you can control menus and queues on the go.",
         },
+      },
+    },
+    contact: {
+      sectionLabel: "Contact",
+      title: "Any questions?",
+      description:
+        "Our team gets back to you as quickly as we can.\n" +
+        "Don't hesitate to reach out for advice, demos, or partnership ideas.",
+      card: {
+        subtitle: "send us a message",
+        nameLabel: "Name",
+        namePlaceholder: "Your full name",
+        emailLabel: "Email",
+        emailPlaceholder: "name@email.com",
+        messageLabel: "Message",
+        messagePlaceholder: "Drop feedback, requests, or anything on your mind",
+        submit: "Send message",
+      },
+      status: {
+        sending: "Sending...",
+        success: "Thanks for reaching out. We'll circle back soon.",
+        error: "Something went wrong. Please try again.",
+      },
+      validation: {
+        nameRequired: "Let us know who we're speaking with.",
+        emailRequired: "Email is required so we can reply.",
+        emailInvalid: "Please enter a valid email address.",
+        messageRequired: "Tell us anything—this field can't stay empty.",
+        emptyAll: "Looks like all fields are blank. Share a quick message so we can help.",
       },
     },
     ready: {
